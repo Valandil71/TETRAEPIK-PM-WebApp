@@ -1,0 +1,77 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 210 20% 98%;
+    --foreground: 222.2 40% 12%;
+    --card: 0 0% 99%;
+    --card-foreground: 222.2 40% 12%;
+    --popover: 0 0% 99%;
+    --popover-foreground: 222.2 40% 12%;
+    --primary: 222.2 47.4% 11.2%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 25% 94%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 22% 94%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 22% 94%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214 20% 88%;
+    --input: 214 20% 88%;
+    --ring: 222.2 84% 4.9%;
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 222.2 34% 10%;
+    --foreground: 210 28% 93%;
+    --card: 222.2 30% 13%;
+    --card-foreground: 210 28% 93%;
+    --popover: 222.2 30% 13%;
+    --popover-foreground: 210 28% 93%;
+    --primary: 210 40% 98%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 217.2 24% 19%;
+    --secondary-foreground: 210 28% 93%;
+    --muted: 217.2 22% 19%;
+    --muted-foreground: 215 16% 72%;
+    --accent: 217.2 24% 19%;
+    --accent-foreground: 210 28% 93%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 18% 23%;
+    --input: 217.2 18% 23%;
+    --ring: 212.7 26.8% 83.9%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Soften extreme utility backgrounds globally */
+.bg-white {
+  background-color: hsl(0 0% 98%) !important;
+}
+
+.dark .dark\:bg-gray-900 {
+  background-color: hsl(222 20% 14%) !important;
+}
+
+.dark .dark\:bg-gray-800 {
+  background-color: hsl(222 18% 17%) !important;
+}
+
+.dark .dark\:bg-gray-950,
+.dark .dark\:bg-black {
+  background-color: hsl(222 22% 11%) !important;
+}
