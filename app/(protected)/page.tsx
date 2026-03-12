@@ -136,7 +136,7 @@ export default function HomePage() {
               <TypewriterText text={userName} speed={50} delay={700} />
             </span>
             <TypewriterText
-              text=", welcome back to TOPAS"
+              text=", welcome back to TOPAS!"
               speed={50}
               delay={900 + userName.length * 50}
             />
