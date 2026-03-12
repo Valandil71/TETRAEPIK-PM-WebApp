@@ -131,18 +131,18 @@ export default function HomePage() {
             </span>
           </div>
           <h1 className="text-gray-900 dark:text-white mb-3 text-4xl md:text-5xl font-bold">
-            <TypewriterText text="Welcome back, " speed={50} delay={0} />
+            <TypewriterText text="Hi " speed={50} delay={0} />
             <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
               <TypewriterText text={userName} speed={50} delay={700} />
             </span>
             <TypewriterText
-              text="! 👋"
+              text=", welcome back to TOPAS"
               speed={50}
               delay={900 + userName.length * 50}
             />
           </h1>
           <p className="text-gray-600 dark:text-gray-300 text-lg">
-            You&apos;re doing great! Keep up the excellent work.
+            TETRAEPIK Operations and Project Alignment Suite
           </p>
         </div>
       </div>
@@ -229,4 +229,6 @@ export default function HomePage() {
     </div>
   );
 }
+
+
 

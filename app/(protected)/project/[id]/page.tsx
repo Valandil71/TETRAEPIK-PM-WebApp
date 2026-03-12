@@ -632,7 +632,7 @@ export default function ProjectPage() {
           )}
           <ProjectInstructionsCard
             instructions={project.instructions}
-            sapInstructions={canManageAssignments() ? project.sap_instructions : null}
+            sapInstructions={project.sap_instructions}
           />
         </div>
 
@@ -757,3 +757,4 @@ export default function ProjectPage() {
     </div>
   );
 }
+
