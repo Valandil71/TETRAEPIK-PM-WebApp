@@ -69,7 +69,7 @@ export default function HomePage() {
 
   const loading = userLoading || countsLoading || projectsLoading;
 
-  const userName = user?.name || user?.short_name || "User";
+  const userName = user?.short_name || user?.name || "User";
 
   // All home cards with role restrictions
   const allHomeCards: HomeCardConfig[] = useMemo(
