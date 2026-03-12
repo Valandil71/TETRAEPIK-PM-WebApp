@@ -351,7 +351,7 @@ export function ProfilePageContent() {
                             readOnly={!isEditing}
                             onClick={() => {
                               if (!isEditing) {
-                                void handleCopyUsername("Full Name", field.value);
+                                void handleCopyUsername("C Username", field.value);
                               }
                             }}
                             className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
@@ -481,6 +481,8 @@ export function ProfilePageContent() {
     </div>
   );
 }
+
+
 
 
 

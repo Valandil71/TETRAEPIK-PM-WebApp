@@ -228,13 +228,13 @@ export function AvatarSelectionModal({
         </DialogHeader>
 
         {/* Tab Switcher */}
-        <div className="flex gap-2 p-1 bg-gray-100 dark:bg-gray-800 rounded-lg">
+        <div className="flex gap-2 p-1 bg-gray-100 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg">
           <button
             onClick={() => handleTabChange("predefined")}
             className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
               activeTab === "predefined" ?
-                "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-gray-100"
-              : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
+                "bg-blue-600 text-white shadow-sm"
+              : "bg-transparent text-gray-700 dark:text-gray-300 hover:bg-white/70 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white"
             }`}
           >
             <ImageIcon className="w-4 h-4" />
@@ -244,8 +244,8 @@ export function AvatarSelectionModal({
             onClick={() => handleTabChange("upload")}
             className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
               activeTab === "upload" ?
-                "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-gray-100"
-              : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
+                "bg-blue-600 text-white shadow-sm"
+              : "bg-transparent text-gray-700 dark:text-gray-300 hover:bg-white/70 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white"
             }`}
           >
             <Upload className="w-4 h-4" />
@@ -567,3 +567,4 @@ export function AvatarSelectionModal({
     </Dialog>
   );
 }
+

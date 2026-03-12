@@ -51,6 +51,7 @@ import { getUserFriendlyError } from "@/utils/toastHelpers";
 
 type DatePreset = "today" | "3days" | "week" | "2weeks" | "month" | "custom";
 type TabType = "byDate" | "byUser";
+const NUMBER_LOCALE = "de-DE";
 
 export default function WorkloadPage() {
   return (
@@ -510,7 +511,7 @@ function WorkloadContent() {
                       Total Words
                     </p>
                     <p className="text-3xl font-semibold text-gray-900 dark:text-white">
-                      {workloadStats.totalWords.toLocaleString()}
+                      {workloadStats.totalWords.toLocaleString(NUMBER_LOCALE)}
                     </p>
                   </div>
                 </div>
@@ -541,7 +542,7 @@ function WorkloadContent() {
                       Total Lines
                     </p>
                     <p className="text-3xl font-semibold text-gray-900 dark:text-white">
-                      {workloadStats.totalLines.toLocaleString()}
+                      {workloadStats.totalLines.toLocaleString(NUMBER_LOCALE)}
                     </p>
                   </div>
                 </div>
@@ -642,10 +643,10 @@ function WorkloadContent() {
                               />
                             </td>
                             <td className="py-3 px-4 text-sm text-gray-900 dark:text-white text-right">
-                              {(project.words || 0).toLocaleString()}
+                              {(project.words || 0).toLocaleString(NUMBER_LOCALE)}
                             </td>
                             <td className="py-3 px-4 text-sm text-gray-900 dark:text-white text-right">
-                              {project.lines || 0}
+                              {(project.lines || 0).toLocaleString(NUMBER_LOCALE)}
                             </td>
                           </tr>
                         );
@@ -660,10 +661,10 @@ function WorkloadContent() {
                           Total
                         </td>
                         <td className="py-3 px-4 text-sm font-semibold text-gray-900 dark:text-white text-right">
-                          {workloadStats.totalWords.toLocaleString()}
+                          {workloadStats.totalWords.toLocaleString(NUMBER_LOCALE)}
                         </td>
                         <td className="py-3 px-4 text-sm font-semibold text-gray-900 dark:text-white text-right">
-                          {workloadStats.totalLines.toLocaleString()}
+                          {workloadStats.totalLines.toLocaleString(NUMBER_LOCALE)}
                         </td>
                       </tr>
                     </tfoot>
@@ -885,10 +886,10 @@ function WorkloadContent() {
                                 }
                               </td>
                               <td className="py-3 px-4 text-sm text-gray-900 dark:text-white text-right">
-                                {workload.filteredWords.toLocaleString()}
+                                {workload.filteredWords.toLocaleString(NUMBER_LOCALE)}
                               </td>
                               <td className="py-3 px-4 text-sm text-gray-900 dark:text-white text-right">
-                                {workload.filteredLines.toLocaleString()}
+                                {workload.filteredLines.toLocaleString(NUMBER_LOCALE)}
                               </td>
                               <td className="py-3 px-4 text-sm text-gray-900 dark:text-white text-right font-medium">
                                 {workload.filteredEstimatedHours}h
@@ -985,10 +986,10 @@ function WorkloadContent() {
                                                   {project.system}
                                                 </td>
                                                 <td className="py-2 px-3 text-gray-900 dark:text-white text-right">
-                                                  {project.wordsShare.toLocaleString()}
+                                                  {project.wordsShare.toLocaleString(NUMBER_LOCALE)}
                                                 </td>
                                                 <td className="py-2 px-3 text-gray-900 dark:text-white text-right">
-                                                  {project.linesShare.toLocaleString()}
+                                                  {project.linesShare.toLocaleString(NUMBER_LOCALE)}
                                                 </td>
                                                 <td className="py-2 px-3">
                                                   <div className="flex flex-wrap gap-2">
@@ -1066,3 +1067,4 @@ function WorkloadContent() {
     </div>
   );
 }
+
