@@ -4,6 +4,7 @@ import "./globals.css";
 import { QueryProvider } from "@/components/providers/QueryProvider";
 import { DarkModeHandler } from "@/components/layout/DarkModeHandler";
 import { Toaster } from "@/components/ui/sonner";
+import { Analytics } from "@vercel/analytics/next";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -27,6 +28,7 @@ export default function RootLayout({
           {children}
           <Toaster richColors position="top-center" />
         </QueryProvider>
+        <Analytics />
       </body>
     </html>
   );
