@@ -165,6 +165,7 @@ export async function runManualImport(params: ManualImportParams): Promise<Manua
 export interface CronSyncResult {
   message: string;
   synced: number;
+  imported: number;
   failed: number;
   errors?: string[];
 }
@@ -173,21 +174,6 @@ export async function runCronSync(
   supabase: SupabaseClient,
   sapClient: SapTpmApiClient,
 ): Promise<CronSyncResult> {
-  // Get all projects that came from SAP
-  const { data: sapProjects, error: fetchError } = await supabase
-    .from('projects')
-    .select('id, sap_subproject_id, sap_import_key, language_in, language_out, translation_area, system, project_type')
-    .eq('api_source', 'TPM_sap_api')
-    .not('sap_subproject_id', 'is', null);
-
-  if (fetchError) {
-    return { message: 'Failed to fetch projects', synced: 0, failed: 0, errors: [fetchError.message] };
-  }
-
-  if (!sapProjects || sapProjects.length === 0) {
-    return { message: 'No SAP projects to sync', synced: 0, failed: 0 };
-  }
-
   // Fetch all SAP projects once
   const sapProjectsData = await sapClient.getProjects();
 
@@ -200,8 +186,9 @@ export async function runCronSync(
   }
 
   let synced = 0;
-  let failed = 0;
-  const errors: string[] = [];
+  let imported = 0;
+  const failures = createFailureRecorder();
+  const reportNewProjects: NewProjectReport[] = [];
   const reportModifiedProjects: ModifiedReportEntry[] = [];
 
   // Cache API calls to avoid duplicate requests for same subproject
@@ -209,21 +196,23 @@ export async function runCronSync(
   const instructionsCache = new Map<string, { instructions: Awaited<ReturnType<typeof sapClient.getInstructions>>['instructions'] }>();
   const importProjectsCache = new Map<string, Map<string, ReturnType<typeof sanitizeImportData>>>();
 
-  for (const localProject of sapProjects) {
+  for (const [, { parent, subProject }] of subProjectToParent) {
+    if (isBlockedSapProjectType(subProject.projectType)) {
+      continue;
+    }
+
+    const cacheKey = `${parent.projectId}|${subProject.subProjectId}`;
+
     try {
-      if (isBlockedSapProjectType(localProject.project_type)) {
-        continue;
-      }
-
-      const sapData = subProjectToParent.get(localProject.sap_subproject_id);
-      if (!sapData) continue;
-
-      const { parent, subProject } = sapData;
-      const cacheKey = `${parent.projectId}|${subProject.subProjectId}`;
-
       // Populate caches if needed
       if (!detailsCache.has(cacheKey)) {
-        const details = await sapClient.getSubProjectDetails(parent.projectId, subProject.subProjectId);
+        let details;
+        try {
+          details = await sapClient.getSubProjectDetails(parent.projectId, subProject.subProjectId);
+        } catch (error) {
+          failures.record('details', `${subProject.subProjectId}: Failed to fetch details: ${error instanceof Error ? error.message : 'Unknown error'}`, parent.projectId, subProject.subProjectId);
+          continue;
+        }
         detailsCache.set(cacheKey, details);
 
         const needsInstructions = details.subProjectSteps.some(s => s.hasInstructions);
@@ -254,27 +243,48 @@ export async function runCronSync(
         );
       }
 
-      if (!localProject.sap_import_key) continue;
+      const importProjects = importProjectsCache.get(cacheKey)!;
 
-      const matchingImport = importProjectsCache.get(cacheKey)?.get(localProject.sap_import_key);
-      if (!matchingImport) continue;
+      for (const [, sanitizedData] of importProjects) {
+        try {
+          const { data: existing, error: matchError } = await findExistingProject(supabase, sanitizedData);
 
-      const { error, changes } = await updateProjectFromSap(supabase, localProject.id, matchingImport);
+          if (matchError) {
+            failures.record('match', `${subProject.subProjectId}: Failed to match: ${matchError.message}`, parent.projectId, subProject.subProjectId);
+            continue;
+          }
 
-      if (error) {
-        failed++;
-        errors.push(`Project ${localProject.id}: ${error}`);
-      } else {
-        synced++;
-        if (Object.keys(changes).length > 0) {
-          reportModifiedProjects.push({ id: localProject.id, name: matchingImport.name, changes });
+          if (existing) {
+            const { error, changes } = await updateProjectFromSap(supabase, existing.id, sanitizedData);
+            if (error) {
+              failures.record('update', `Project ${existing.id}: ${error}`, parent.projectId, subProject.subProjectId);
+            } else {
+              synced++;
+              if (Object.keys(changes).length > 0) {
+                reportModifiedProjects.push({ id: existing.id, name: sanitizedData.name, changes });
+              }
+            }
+          } else {
+            const { id, error } = await insertProjectFromSap(supabase, sanitizedData);
+            if (error) {
+              failures.record('insert', `${subProject.subProjectId}: Failed to insert: ${error}`, parent.projectId, subProject.subProjectId);
+            } else {
+              imported++;
+              reportNewProjects.push({
+                id: id!,
+                name: sanitizedData.name,
+                system: sanitizedData.system,
+                language_in: sanitizedData.language_in,
+                language_out: sanitizedData.language_out,
+              });
+            }
+          }
+        } catch (error) {
+          failures.record('process', `${subProject.subProjectId}: ${error instanceof Error ? error.message : 'Unknown error'}`, parent.projectId, subProject.subProjectId);
         }
       }
     } catch (error) {
-      failed++;
-      errors.push(
-        `Project ${localProject.id}: ${error instanceof Error ? error.message : 'Unknown error'}`
-      );
+      failures.record('process', `${subProject.subProjectId}: ${error instanceof Error ? error.message : 'Unknown error'}`, parent.projectId, subProject.subProjectId);
     }
   }
 
@@ -283,14 +293,15 @@ export async function runCronSync(
   await createImportReport(supabase, {
     triggeredBy: null,
     reportType: 'cron',
-    newProjects: [],
+    newProjects: reportNewProjects,
     modifiedProjects: mergedModifiedProjects,
   });
 
   return {
     message: 'SAP sync complete',
     synced,
-    failed,
-    errors: errors.length > 0 ? errors : undefined,
+    imported,
+    failed: failures.failedCount,
+    errors: failures.errorMessages.length > 0 ? failures.errorMessages : undefined,
   };
 }
