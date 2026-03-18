@@ -19,9 +19,10 @@ export async function createImportReport(
     reportType: 'manual' | 'cron';
     newProjects: NewProjectReport[];
     modifiedProjects: ModifiedReportEntry[];
+    durationMs?: number;
   },
 ) {
-  const { triggeredBy, reportType, newProjects, modifiedProjects } = params;
+  const { triggeredBy, reportType, newProjects, modifiedProjects, durationMs } = params;
 
   if (newProjects.length === 0 && modifiedProjects.length === 0) {
     return { created: false, error: null };
@@ -37,6 +38,7 @@ export async function createImportReport(
     modified_projects: modifiedProjects,
     summary,
     acknowledged_by: [],
+    duration_ms: durationMs ?? null,
   });
 
   if (error) {

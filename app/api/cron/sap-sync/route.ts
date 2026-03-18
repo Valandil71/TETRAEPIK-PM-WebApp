@@ -1,6 +1,8 @@
 // /app/api/cron/sap-sync/route.ts
 // GET: Scheduled sync of all SAP-sourced projects (Vercel cron)
 
+export const maxDuration = 60;
+
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';

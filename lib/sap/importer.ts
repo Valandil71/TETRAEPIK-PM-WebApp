@@ -42,6 +42,7 @@ export async function runManualImport(params: ManualImportParams): Promise<Manua
 
   let imported = 0;
   let hadSuccessfulSync = false;
+  const startedAt = Date.now();
 
   for (const { projectId, subProjectId } of projects) {
     try {
@@ -140,6 +141,7 @@ export async function runManualImport(params: ManualImportParams): Promise<Manua
     reportType: 'manual',
     newProjects: reportNewProjects,
     modifiedProjects: mergedModifiedProjects,
+    durationMs: Date.now() - startedAt,
   });
 
   const result: ManualImportResult = {
@@ -187,6 +189,7 @@ export async function runCronSync(
 
   let synced = 0;
   let imported = 0;
+  const startedAt = Date.now();
   const failures = createFailureRecorder();
   const reportNewProjects: NewProjectReport[] = [];
   const reportModifiedProjects: ModifiedReportEntry[] = [];
@@ -295,6 +298,7 @@ export async function runCronSync(
     reportType: 'cron',
     newProjects: reportNewProjects,
     modifiedProjects: mergedModifiedProjects,
+    durationMs: Date.now() - startedAt,
   });
 
   return {
