@@ -58,6 +58,7 @@ function AssignProjectsContent() {
   const queryClient = useQueryClient();
   const { user } = useUser();
   const collapsed = useLayoutStore((state) => state.collapsed);
+  const groupExpansionMode = useLayoutStore((state) => state.groupExpansionMode);
 
   const [selectedProjects, setSelectedProjects] = useState<Set<number>>(() => {
     if (typeof window === "undefined") return new Set();
@@ -192,10 +193,10 @@ function AssignProjectsContent() {
     [filteredProjects]
   );
 
-  const { expandedGroups, toggleGroup, expandGroup, expandAll, collapseAll } =
+  const { expandedGroups, toggleGroup, expandGroup } =
     useProjectGroupExpansion({
       groups: groupedProjects,
-      defaultExpanded: false,
+      defaultExpanded: groupExpansionMode === "expandAll",
     });
 
   const handleSelection = (projectId: number) => {
@@ -440,20 +441,6 @@ function AssignProjectsContent() {
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            <button
-              onClick={expandAll}
-              className="px-4 py-2 cursor-pointer rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:border-blue-400 dark:hover:border-blue-500 transition-all text-sm shadow-sm"
-              type="button"
-            >
-              Expand all
-            </button>
-            <button
-              onClick={collapseAll}
-              className="px-4 py-2 cursor-pointer rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:border-blue-400 dark:hover:border-blue-500 transition-all text-sm shadow-sm"
-              type="button"
-            >
-              Collapse all
-            </button>
             {hasActiveFilters && (
               <button
                 onClick={clearAllFilters}

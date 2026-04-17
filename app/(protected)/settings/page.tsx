@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ColorSettings } from "@/components/settings/ColorSettings";
 import { ThemeSettings } from "@/components/settings/ThemeSettings";
+import { GroupExpansionSettings } from "@/components/settings/GroupExpansionSettings";
 import { UserRoleManagement } from "@/components/settings/UserRoleManagement";
 import { InstructionExclusionSettings } from "@/components/settings/InstructionExclusionSettings";
 import { DefaultFilterSettings } from "@/components/settings/DefaultFilterSettings";
@@ -97,6 +98,9 @@ export default function SettingsPage() {
       <h1 className="text-4xl font-bold">Settings</h1>
       <Card className="p-6 text-left">
         <ThemeSettings />
+      </Card>
+      <Card className="p-6 text-left">
+        <GroupExpansionSettings />
       </Card>
       {/* Only show ColorSettings card for admins */}
       {canEditColors() && (
