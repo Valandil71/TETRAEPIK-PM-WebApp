@@ -302,11 +302,11 @@ export default function ProjectPage() {
     mutationFn: async () => {
       if (!project) throw new Error("Project is required");
 
-      const projectData = { ...project };
-      delete projectData.id;
-      delete projectData.created_at;
-      delete projectData.updated_at;
-      delete projectData.translators;
+      const { id, created_at, updated_at, translators, ...projectData } = project;
+      void id;
+      void created_at;
+      void updated_at;
+      void translators;
 
       const { data: newProject, error } = await supabase
         .from("projects")
