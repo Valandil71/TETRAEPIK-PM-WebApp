@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Edit, Loader2, Check, X, Copy, Info } from "lucide-react";
+import { ArrowLeft, Edit, Loader2, Check, X, FilePlus, Info } from "lucide-react";
 import { formatProjectName } from "@/utils/formatters";
 import { useEffect, useRef, useState } from "react";
 import { useProject } from "@/hooks/project/useProject";
@@ -298,9 +298,44 @@ export default function ProjectPage() {
     router.push(`/project/${projectId}/edit`);
   };
 
-  const handleDuplicate = () => {
-    if (!projectId) return;
-    router.push(`/new-project?duplicateFrom=${projectId}`);
+  const createStmProjectMutation = useMutation({
+    mutationFn: async () => {
+      if (!project) throw new Error("Project is required");
+
+      const projectData = { ...project };
+      delete projectData.id;
+      delete projectData.created_at;
+      delete projectData.updated_at;
+      delete projectData.translators;
+
+      const { data: newProject, error } = await supabase
+        .from("projects")
+        .insert({
+          ...projectData,
+          system: "STM",
+        })
+        .select("id")
+        .single();
+
+      if (error) {
+        throw new Error(`Failed to create STM project: ${error.message}`);
+      }
+
+      return newProject;
+    },
+    onSuccess: (newProject) => {
+      queryClient.invalidateQueries({ queryKey: ["projects-with-translators"] });
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+      toast.success("STM project created successfully. Opening it now.");
+      router.push(`/project/${newProject.id}`);
+    },
+    onError: (error: Error) => {
+      toast.error(getUserFriendlyError(error, "project creation"));
+    },
+  });
+
+  const handleCreateStmProject = () => {
+    createStmProjectMutation.mutate();
   };
 
   const handleAddTranslator = () => {
@@ -535,17 +570,21 @@ export default function ProjectPage() {
 
           {/* Action buttons based on role */}
           <div className="flex gap-2">
-            {/* PM/Admin: Duplicate and Edit buttons */}
+            {/* PM/Admin: Create STM and Edit buttons */}
             {canManageAssignments() && (
               <>
                 <Button
-                  onClick={handleDuplicate}
+                  onClick={handleCreateStmProject}
                   size="sm"
                   variant="outline"
+                  disabled={createStmProjectMutation.isPending}
                   className="cursor-pointer"
                 >
-                  <Copy className="w-4 h-4 mr-2" />
-                  Duplicate
+                  {createStmProjectMutation.isPending ?
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  : <FilePlus className="w-4 h-4 mr-2" />
+                  }
+                  {createStmProjectMutation.isPending ? "Creating STM..." : "Create STM Project"}
                 </Button>
                 <Button
                   onClick={handleEdit}
