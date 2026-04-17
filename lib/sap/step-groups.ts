@@ -23,6 +23,28 @@ import {
 import { buildInstructions, buildSapInstructions } from './instructions';
 import { sanitizeString } from './mappers';
 import { isBlockedSapProjectType } from './project-type-rules';
+import { SAP_DEADLINE_OFFSET_HOURS } from './constants';
+
+function applyDeadlineOffset(isoDate: string | null | undefined): string | null {
+  if (!isoDate) return null;
+
+  const timestamp = Date.parse(isoDate);
+  if (Number.isNaN(timestamp)) return null;
+
+  const shifted = new Date(timestamp);
+  shifted.setUTCHours(shifted.getUTCHours() + SAP_DEADLINE_OFFSET_HOURS);
+  return shifted.toISOString();
+}
+
+function isEarlierIsoDate(candidate: string, current: string | null): boolean {
+  if (!current) return true;
+  return Date.parse(candidate) < Date.parse(current);
+}
+
+function isLaterIsoDate(candidate: string, current: string | null): boolean {
+  if (!current) return true;
+  return Date.parse(candidate) > Date.parse(current);
+}
 
 // ============================================================================
 // Step Joining (TRANSLFWL + TRANSLREGU)
@@ -32,8 +54,8 @@ export interface JoinedStepGroup {
   contentId: string;
   languageIn: string | null;
   languageOut: string | null;
-  initialDeadline: string | null;  // from TRANSLREGU endDate
-  finalDeadline: string | null;    // from TRANSLFWL endDate
+  initialDeadline: string | null; // from TRANSLREGU endDate
+  finalDeadline: string | null; // from TRANSLFWL endDate
   words: number;
   lines: number;
   hours: number;
@@ -44,8 +66,8 @@ export interface JoinedStepGroup {
 
 /**
  * Group steps by contentId + language pair, joining TRANSLFWL and TRANSLREGU.
- * TRANSLREGU endDate → initial_deadline
- * TRANSLFWL endDate → final_deadline
+ * TRANSLREGU endDate -> initial_deadline
+ * TRANSLFWL endDate -> final_deadline
  */
 export function joinSteps(steps: SapStep[]): JoinedStepGroup[] {
   const groups = new Map<string, JoinedStepGroup>();
@@ -72,22 +94,24 @@ export function joinSteps(steps: SapStep[]): JoinedStepGroup[] {
     const group = groups.get(key)!;
     group.allSteps.push(step);
 
+    const adjustedEndDate = applyDeadlineOffset(step.endDate);
+
     // Deadline assignment based on service step type
-    if (step.serviceStep === 'TRANSLREGU' && step.endDate) {
-      if (!group.initialDeadline || step.endDate > group.initialDeadline) {
-        group.initialDeadline = step.endDate;
+    if (step.serviceStep === 'TRANSLREGU' && adjustedEndDate) {
+      if (isLaterIsoDate(adjustedEndDate, group.initialDeadline)) {
+        group.initialDeadline = adjustedEndDate;
       }
     }
-    if (step.serviceStep === 'TRANSLFWL' && step.endDate) {
-      if (!group.finalDeadline || step.endDate > group.finalDeadline) {
-        group.finalDeadline = step.endDate;
+    if (step.serviceStep === 'TRANSLFWL' && adjustedEndDate) {
+      if (isLaterIsoDate(adjustedEndDate, group.finalDeadline)) {
+        group.finalDeadline = adjustedEndDate;
       }
     }
 
     // If neither TRANSLFWL nor TRANSLREGU, use endDate as final_deadline
-    if (step.serviceStep !== 'TRANSLREGU' && step.serviceStep !== 'TRANSLFWL' && step.endDate) {
-      if (!group.finalDeadline || step.endDate > group.finalDeadline) {
-        group.finalDeadline = step.endDate;
+    if (step.serviceStep !== 'TRANSLREGU' && step.serviceStep !== 'TRANSLFWL' && adjustedEndDate) {
+      if (isLaterIsoDate(adjustedEndDate, group.finalDeadline)) {
+        group.finalDeadline = adjustedEndDate;
       }
     }
 
@@ -95,15 +119,23 @@ export function joinSteps(steps: SapStep[]): JoinedStepGroup[] {
     for (const vol of step.volume ?? []) {
       const qty = vol.volumeQuantity || vol.ceBillQuantity || 0;
       switch (vol.volumeUnit) {
-        case 'Words': group.words += qty; break;
-        case 'Lines': group.lines += qty; break;
-        case 'Hours': group.hours += qty; break;
-        case 'Terms': group.terms += 1; break;
+        case 'Words':
+          group.words += qty;
+          break;
+        case 'Lines':
+          group.lines += qty;
+          break;
+        case 'Hours':
+          group.hours += qty;
+          break;
+        case 'Terms':
+          group.terms += 1;
+          break;
       }
     }
 
     // Track Terms presence in TRANSLFWL steps specifically
-    if (step.serviceStep === 'TRANSLFWL' && (step.volume ?? []).some(v => v.volumeUnit === 'Terms')) {
+    if (step.serviceStep === 'TRANSLFWL' && (step.volume ?? []).some((v) => v.volumeUnit === 'Terms')) {
       group.hasTermsInFwl = true;
     }
   }
@@ -115,7 +147,7 @@ export function joinSteps(steps: SapStep[]): JoinedStepGroup[] {
 // Multi-Project Logic
 // ============================================================================
 
-/** Systems that create language_pairs × translationAreas projects */
+/** Systems that create language_pairs x translationAreas projects */
 const MULTI_TA_SYSTEMS = new Set(['SSE', 'SSK', 'SSH']);
 
 function keyPart(value: string | null | undefined): string {
@@ -187,7 +219,7 @@ export function mapSapSubProjectToProjects(
   const results: SapProjectForImport[] = [];
 
   if (MULTI_TA_SYSTEMS.has(system)) {
-    // SSE/SSK/SSH: unique_language_pairs × translationAreas
+    // SSE/SSK/SSH: unique_language_pairs x translationAreas
     const uniqueLangPairs = new Map<string, JoinedStepGroup>();
 
     for (const group of joinedGroups) {
@@ -195,12 +227,12 @@ export function mapSapSubProjectToProjects(
       if (!uniqueLangPairs.has(langKey)) {
         uniqueLangPairs.set(langKey, group);
       } else {
-        // Merge deadlines, volumes
+        // Merge deadlines and volumes
         const existing = uniqueLangPairs.get(langKey)!;
-        if (group.initialDeadline && (!existing.initialDeadline || group.initialDeadline < existing.initialDeadline)) {
+        if (group.initialDeadline && isEarlierIsoDate(group.initialDeadline, existing.initialDeadline)) {
           existing.initialDeadline = group.initialDeadline;
         }
-        if (group.finalDeadline && (!existing.finalDeadline || group.finalDeadline > existing.finalDeadline)) {
+        if (group.finalDeadline && isLaterIsoDate(group.finalDeadline, existing.finalDeadline)) {
           existing.finalDeadline = group.finalDeadline;
         }
         existing.words += group.words;
@@ -228,9 +260,9 @@ export function mapSapSubProjectToProjects(
           system,
         });
 
-        // Deadline filter — skip if all deadlines are in the past
+        // Deadline filter - skip if all deadlines are in the past
         const deadlines = [langGroup.finalDeadline, langGroup.initialDeadline].filter(Boolean);
-        const allInPast = deadlines.length > 0 && deadlines.every(d => new Date(d!) < today);
+        const allInPast = deadlines.length > 0 && deadlines.every((d) => new Date(d!) < today);
 
         if (allInPast) continue;
 
@@ -267,113 +299,86 @@ export function mapSapSubProjectToProjects(
           lines: langGroup.lines || null,
         });
       }
-
-      if (langGroup.hasTermsInFwl) {
-        // Deadline filter — skip STM if all deadlines are in the past
-        const stmDeadlines = [langGroup.finalDeadline, langGroup.initialDeadline].filter(Boolean);
-        const stmAllInPast = stmDeadlines.length > 0 && stmDeadlines.every(d => new Date(d!) < today);
-
-        if (!stmAllInPast) {
-          const stmInstructions = buildInstructions({
-            translationAreas: allTranslationAreas,
-            lxeProjects: allLxeProjects,
-            graphIds: allGraphIds,
-            hours: langGroup.hours,
-            terms: langGroup.terms,
-            terminologyKeys,
-            workLists: allWorkLists,
-            system: 'STM',
-          });
-
-          results.push({
-            sap_subproject_id: subProject.subProjectId,
-            sap_import_key: buildSapImportKey({
-              mode: 'STM',
-              system: 'STM',
-              languageIn: langGroup.languageIn,
-              languageOut: langGroup.languageOut,
-            }),
-            name: sanitizeString(baseName) || baseName,
-            language_in: langGroup.languageIn,
-            language_out: langGroup.languageOut,
-            initial_deadline: langGroup.initialDeadline,
-            final_deadline: langGroup.finalDeadline,
-            instructions: stmInstructions,
-            sap_instructions: sapInstructions,
-            system: 'STM',
-            api_source: 'TPM_sap_api',
-            last_synced_at: now,
-            sap_pm: sapPm,
-            project_type: projectType,
-            terminology_key: terminologyKeys.length > 0 ? terminologyKeys : null,
-            lxe_project: allLxeProjects.length > 0 ? allLxeProjects : null,
-            translation_area: allTranslationAreas.length > 0 ? allTranslationAreas : null,
-            work_list: allWorkLists.length > 0 ? allWorkLists : null,
-            graph_id: allGraphIds.length > 0 ? allGraphIds : null,
-            lxe_projects: allLxeProjects.length > 0 ? allLxeProjects : null,
-            url,
-            hours: langGroup.hours || null,
-            words: null,
-            lines: null,
-          });
-        }
-      }
     }
   } else {
-    // All other systems: 1 project per contentId
-    const contentGroups = new Map<string, JoinedStepGroup[]>();
+    // All other systems: 1 project per language pair (merge contentIds)
+    const groupsForMapping = joinedGroups.length > 0
+      ? joinedGroups
+      : [
+          {
+            contentId: '_default',
+            languageIn: null,
+            languageOut: null,
+            initialDeadline: null,
+            finalDeadline: null,
+            words: 0,
+            lines: 0,
+            hours: 0,
+            terms: 0,
+            hasTermsInFwl: false,
+            allSteps: [],
+          } satisfies JoinedStepGroup,
+        ];
 
-    for (const group of joinedGroups) {
-      const cid = group.contentId || '_default';
-      if (!contentGroups.has(cid)) {
-        contentGroups.set(cid, []);
+    const languageGroups = new Map<
+      string,
+      {
+        languageIn: string | null;
+        languageOut: string | null;
+        groups: JoinedStepGroup[];
+        contentIds: Set<string>;
       }
-      contentGroups.get(cid)!.push(group);
+    >();
+
+    for (const group of groupsForMapping) {
+      const langKey = `${group.languageIn ?? '_'}|${group.languageOut ?? '_'}`;
+      if (!languageGroups.has(langKey)) {
+        languageGroups.set(langKey, {
+          languageIn: group.languageIn,
+          languageOut: group.languageOut,
+          groups: [],
+          contentIds: new Set<string>(),
+        });
+      }
+
+      const langGroup = languageGroups.get(langKey)!;
+      langGroup.groups.push(group);
+      if (group.contentId) {
+        langGroup.contentIds.add(group.contentId);
+      }
     }
 
-    // If no content groups at all, create one project from environment data
-    if (contentGroups.size === 0) {
-      contentGroups.set('_default', []);
-    }
-
-    for (const [contentId, groups] of contentGroups) {
-      // Find environment matching this contentId
-      const matchingEnv = details.environment.find(e => e.contentId === contentId);
-
-      // Merge all groups for this contentId
-      let langIn: string | null = null;
-      let langOut: string | null = null;
+    for (const [, langGroup] of languageGroups) {
       let initialDeadline: string | null = null;
       let finalDeadline: string | null = null;
       let words = 0;
       let lines = 0;
       let hours = 0;
       let terms = 0;
-      let hasTermsInFwl = false;
 
-      for (const g of groups) {
-        if (!langIn) langIn = g.languageIn;
-        if (!langOut) langOut = g.languageOut;
-        if (g.initialDeadline && (!initialDeadline || g.initialDeadline < initialDeadline)) {
-          initialDeadline = g.initialDeadline;
+      for (const group of langGroup.groups) {
+        if (group.initialDeadline && isEarlierIsoDate(group.initialDeadline, initialDeadline)) {
+          initialDeadline = group.initialDeadline;
         }
-        if (g.finalDeadline && (!finalDeadline || g.finalDeadline > finalDeadline)) {
-          finalDeadline = g.finalDeadline;
+        if (group.finalDeadline && isLaterIsoDate(group.finalDeadline, finalDeadline)) {
+          finalDeadline = group.finalDeadline;
         }
-        words += g.words;
-        lines += g.lines;
-        hours += g.hours;
-        terms += g.terms;
-        hasTermsInFwl = hasTermsInFwl || g.hasTermsInFwl;
+
+        words += group.words;
+        lines += group.lines;
+        hours += group.hours;
+        terms += group.terms;
       }
 
-      // Extract TA from matching env or all envs
-      const envTAs = matchingEnv ? extractTranslationAreas([matchingEnv]) : allTranslationAreas;
-      const envLxeProjects = matchingEnv
-        ? extractLxeProjects([matchingEnv])
-        : allLxeProjects;
-      const envGraphIds = matchingEnv ? extractGraphIds([matchingEnv]) : allGraphIds;
-      const envWorkLists = matchingEnv ? extractWorkLists([matchingEnv]) : allWorkLists;
+      const scopedEnvironments = details.environment.filter((env) =>
+        langGroup.contentIds.has(env.contentId)
+      );
+      const envScope = scopedEnvironments.length > 0 ? scopedEnvironments : details.environment;
+
+      const envTAs = extractTranslationAreas(envScope);
+      const envLxeProjects = extractLxeProjects(envScope);
+      const envGraphIds = extractGraphIds(envScope);
+      const envWorkLists = extractWorkLists(envScope);
 
       const composedInstructions = buildInstructions({
         translationAreas: envTAs,
@@ -389,9 +394,9 @@ export function mapSapSubProjectToProjects(
       // XTM words normalization
       const finalWords = system === 'XTM' ? (words !== 0 ? 1 : 0) : words;
 
-      // Deadline filter — skip if all deadlines are in the past
+      // Deadline filter - skip if all deadlines are in the past
       const deadlines = [finalDeadline, initialDeadline].filter(Boolean);
-      const allInPast = deadlines.length > 0 && deadlines.every(d => new Date(d!) < today);
+      const allInPast = deadlines.length > 0 && deadlines.every((d) => new Date(d!) < today);
 
       if (allInPast) continue;
 
@@ -400,13 +405,12 @@ export function mapSapSubProjectToProjects(
         sap_import_key: buildSapImportKey({
           mode: 'STD',
           system,
-          languageIn: langIn,
-          languageOut: langOut,
-          contentId,
+          languageIn: langGroup.languageIn,
+          languageOut: langGroup.languageOut,
         }),
         name: sanitizeString(baseName) || baseName,
-        language_in: langIn,
-        language_out: langOut,
+        language_in: langGroup.languageIn,
+        language_out: langGroup.languageOut,
         initial_deadline: initialDeadline,
         final_deadline: finalDeadline,
         instructions: composedInstructions,
@@ -427,52 +431,6 @@ export function mapSapSubProjectToProjects(
         words: finalWords || null,
         lines: lines || null,
       });
-
-      if (hasTermsInFwl && system !== 'SMARTLING') {
-        const stmInstructions = buildInstructions({
-          translationAreas: envTAs,
-          lxeProjects: envLxeProjects,
-          graphIds: envGraphIds,
-          hours,
-          terms,
-          terminologyKeys,
-          workLists: envWorkLists,
-          system: 'STM',
-        });
-
-        results.push({
-          sap_subproject_id: subProject.subProjectId,
-          sap_import_key: buildSapImportKey({
-            mode: 'STM',
-            system: 'STM',
-            languageIn: langIn,
-            languageOut: langOut,
-            contentId,
-          }),
-          name: sanitizeString(baseName) || baseName,
-          language_in: langIn,
-          language_out: langOut,
-          initial_deadline: initialDeadline,
-          final_deadline: finalDeadline,
-          instructions: stmInstructions,
-          sap_instructions: sapInstructions,
-          system: 'STM',
-          api_source: 'TPM_sap_api',
-          last_synced_at: now,
-          sap_pm: sapPm,
-          project_type: projectType,
-          terminology_key: terminologyKeys.length > 0 ? terminologyKeys : null,
-          lxe_project: envLxeProjects.length > 0 ? envLxeProjects : null,
-          translation_area: envTAs.length > 0 ? envTAs : null,
-          work_list: envWorkLists.length > 0 ? envWorkLists : null,
-          graph_id: envGraphIds.length > 0 ? envGraphIds : null,
-          lxe_projects: envLxeProjects.length > 0 ? envLxeProjects : null,
-          url,
-          hours: hours || null,
-          words: null,
-          lines: null,
-        });
-      }
     }
   }
 

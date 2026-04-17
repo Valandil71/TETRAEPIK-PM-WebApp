@@ -104,6 +104,43 @@ export async function findExistingProject(
     return { data: legacyMatches.data![0], error: null };
   }
 
+  // Compatibility fallback:
+  // if import key logic changes, reuse the oldest matching project row
+  // to avoid creating additional duplicates for the same language/system pair.
+  let compatibilityQuery = supabase
+    .from('projects')
+    .select('id')
+    .eq('sap_subproject_id', data.sap_subproject_id)
+    .eq('system', data.system);
+
+  if (data.language_in) {
+    compatibilityQuery = compatibilityQuery.eq('language_in', data.language_in);
+  } else {
+    compatibilityQuery = compatibilityQuery.is('language_in', null);
+  }
+
+  if (data.language_out) {
+    compatibilityQuery = compatibilityQuery.eq('language_out', data.language_out);
+  } else {
+    compatibilityQuery = compatibilityQuery.is('language_out', null);
+  }
+
+  if (multiTaSystems.includes(data.system) && data.translation_area?.length) {
+    compatibilityQuery = compatibilityQuery.contains('translation_area', [data.translation_area[0]]);
+  }
+
+  const compatibilityMatches = await compatibilityQuery
+    .order('id', { ascending: true })
+    .limit(2);
+
+  if (compatibilityMatches.error) {
+    return { data: null, error: compatibilityMatches.error };
+  }
+
+  if ((compatibilityMatches.data?.length || 0) >= 1) {
+    return { data: compatibilityMatches.data![0], error: null };
+  }
+
   return { data: null, error: null };
 }
 

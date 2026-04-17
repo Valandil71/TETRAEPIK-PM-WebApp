@@ -4,6 +4,7 @@
 export const SAP_IMPORT_STATUS_ROW_ID = 1;
 export const RATE_LIMIT_MINUTES = 3;
 export const LOCK_TTL_MINUTES = 10;
+export const SAP_DEADLINE_OFFSET_HOURS = -3;
 
 /** Fields compared between current DB row and incoming SAP data for change reports */
 export const TRACKED_FIELDS = [

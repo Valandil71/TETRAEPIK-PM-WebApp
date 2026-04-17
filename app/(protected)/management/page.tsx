@@ -105,6 +105,10 @@ function ProjectManagementContent() {
   const [editWords, setEditWords] = useState<string>("");
   const [editLines, setEditLines] = useState<string>("");
   const [editFocusField, setEditFocusField] = useState<"words" | "lines">("words");
+  const sanitizeDigitsOnly = useCallback(
+    (value: string) => value.replace(/[^\d]/g, ""),
+    []
+  );
 
   // Project type filter (page-specific, on top of shared filters)
   // Override is tagged with pathname so it auto-expires on navigation
@@ -500,10 +504,31 @@ function ProjectManagementContent() {
   };
 
   const handleSaveWordsLines = (projectId: number) => {
-    const words = editWords ? parseInt(editWords) : null;
-    const lines = editLines ? parseInt(editLines) : null;
+    const wordsInput = editWords.trim();
+    const linesInput = editLines.trim();
+
+    if (
+      (wordsInput !== "" && !/^\d+$/.test(wordsInput)) ||
+      (linesInput !== "" && !/^\d+$/.test(linesInput))
+    ) {
+      toast.error("Words and Lines must contain only numbers.");
+      return;
+    }
+
+    const words = wordsInput === "" ? null : Number.parseInt(wordsInput, 10);
+    const lines = linesInput === "" ? null : Number.parseInt(linesInput, 10);
     updateWordsLinesMutation.mutate({ projectId, words, lines });
   };
+
+  const handleEditWordsChange = useCallback(
+    (value: string) => setEditWords(sanitizeDigitsOnly(value)),
+    [sanitizeDigitsOnly]
+  );
+
+  const handleEditLinesChange = useCallback(
+    (value: string) => setEditLines(sanitizeDigitsOnly(value)),
+    [sanitizeDigitsOnly]
+  );
 
   const handleCancelWordsLinesEdit = () => {
     setEditingProjectId(null);
@@ -765,8 +790,8 @@ function ProjectManagementContent() {
           editFocusField={editFocusField}
           editWords={editWords}
           editLines={editLines}
-          onEditWordsChange={setEditWords}
-          onEditLinesChange={setEditLines}
+          onEditWordsChange={handleEditWordsChange}
+          onEditLinesChange={handleEditLinesChange}
           onStartWordsLinesEdit={handleStartWordsLinesEdit}
           onSaveWordsLines={handleSaveWordsLines}
           onCancelWordsLinesEdit={handleCancelWordsLinesEdit}
@@ -790,8 +815,8 @@ function ProjectManagementContent() {
           editFocusField={editFocusField}
           editWords={editWords}
           editLines={editLines}
-          onEditWordsChange={setEditWords}
-          onEditLinesChange={setEditLines}
+          onEditWordsChange={handleEditWordsChange}
+          onEditLinesChange={handleEditLinesChange}
           onStartWordsLinesEdit={handleStartWordsLinesEdit}
           onSaveWordsLines={handleSaveWordsLines}
           onCancelWordsLinesEdit={handleCancelWordsLinesEdit}

@@ -75,3 +75,15 @@
 .dark .dark\:bg-black {
   background-color: hsl(222 22% 11%) !important;
 }
+
+/* Hide spinner arrows for targeted numeric fields (keep numeric keyboard/input behavior). */
+input.no-spinner::-webkit-outer-spin-button,
+input.no-spinner::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input.no-spinner[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}

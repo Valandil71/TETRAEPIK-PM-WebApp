@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildSapUpdatePayload } from '@/lib/sap/project-writer';
+import { buildSapUpdatePayload, findExistingProject } from '@/lib/sap/project-writer';
 import type { SapProjectForImport } from '@/types/sap';
 
 const baseData: SapProjectForImport = {
@@ -40,5 +40,37 @@ describe('buildSapUpdatePayload', () => {
     const payload = buildSapUpdatePayload(baseData, { includeVolumes: false });
     expect('words' in payload).toBe(false);
     expect('lines' in payload).toBe(false);
+  });
+});
+
+function createSupabaseSequenceMock(results: Array<{ data: unknown; error: unknown }>) {
+  let index = 0;
+
+  const builder: Record<string, (...args: unknown[]) => unknown> = {};
+  builder.select = () => builder;
+  builder.eq = () => builder;
+  builder.is = () => builder;
+  builder.contains = () => builder;
+  builder.order = () => builder;
+  builder.maybeSingle = async () => results[index++] ?? { data: null, error: null };
+  builder.limit = async () => results[index++] ?? { data: null, error: null };
+
+  return {
+    from: () => builder,
+  };
+}
+
+describe('findExistingProject', () => {
+  it('uses compatibility fallback when exact and legacy match fail', async () => {
+    const supabase = createSupabaseSequenceMock([
+      { data: null, error: null }, // exact maybeSingle
+      { data: [{ id: 10 }, { id: 11 }], error: null }, // legacy limit(2)
+      { data: [{ id: 22 }, { id: 23 }], error: null }, // compatibility limit(2)
+    ]);
+
+    const result = await findExistingProject(supabase as never, baseData);
+
+    expect(result.error).toBeNull();
+    expect(result.data).toEqual({ id: 22 });
   });
 });

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildSapInstructions } from '@/lib/sap/instructions';
+import { buildInstructions } from '@/lib/sap/instructions';
 import { filterSapInstructions } from '@/lib/sap/instruction-exclusions';
 import {
   normalizeInstructionText,
@@ -57,5 +58,22 @@ describe('instruction normalization', () => {
 
     expect(visible).toHaveLength(1);
     expect(visible[0].long).toBe('Keep this');
+  });
+
+  it('does not include Terms in composed instructions', () => {
+    const composed = buildInstructions({
+      translationAreas: ['000053'],
+      lxeProjects: [],
+      graphIds: ['00587'],
+      hours: 2,
+      terms: 4,
+      terminologyKeys: [],
+      workLists: ['0001'],
+      system: 'B0X',
+    });
+
+    expect(composed).toContain('TA: 000053');
+    expect(composed).toContain('Hours: 2');
+    expect(composed).not.toContain('Terms:');
   });
 });

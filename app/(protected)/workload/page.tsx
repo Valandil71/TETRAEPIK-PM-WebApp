@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback, Fragment } from "react";
+import { useState, useMemo, useCallback, Fragment, useEffect, useRef } from "react";
 import {
   Loader2,
   AlertCircle,
@@ -92,6 +92,13 @@ function WorkloadContent() {
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [editWordsPerHour, setEditWordsPerHour] = useState<string>("");
   const [editLinesPerHour, setEditLinesPerHour] = useState<string>("");
+  const [editRateFocusField, setEditRateFocusField] = useState<"words" | "lines">("words");
+  const wordsPerHourInputRef = useRef<HTMLInputElement | null>(null);
+  const linesPerHourInputRef = useRef<HTMLInputElement | null>(null);
+  const sanitizeDigitsOnly = useCallback(
+    (value: string) => value.replace(/[^\d]/g, ""),
+    []
+  );
 
   // Fetch all projects
   const {
@@ -241,19 +248,49 @@ function WorkloadContent() {
     },
   });
 
+  useEffect(() => {
+    if (!editingUserId) return;
+
+    const targetInput =
+      editRateFocusField === "lines"
+        ? linesPerHourInputRef.current
+        : wordsPerHourInputRef.current;
+
+    if (!targetInput) return;
+
+    targetInput.focus();
+    targetInput.select();
+  }, [editingUserId, editRateFocusField]);
+
   const handleStartEdit = (
     userId: string,
     wordsPerHour: number,
-    linesPerHour: number
+    linesPerHour: number,
+    focusField: "words" | "lines" = "words"
   ) => {
     setEditingUserId(userId);
     setEditWordsPerHour(wordsPerHour.toString());
     setEditLinesPerHour(linesPerHour.toString());
+    setEditRateFocusField(focusField);
   };
 
   const handleSaveEdit = (userId: string) => {
-    const wordsPerHour = parseInt(editWordsPerHour) || 500;
-    const linesPerHour = parseInt(editLinesPerHour) || 50;
+    const wordsInput = editWordsPerHour.trim();
+    const linesInput = editLinesPerHour.trim();
+
+    if (!/^\d+$/.test(wordsInput) || !/^\d+$/.test(linesInput)) {
+      toast.error("Words/Hour and Lines/Hour must contain only numbers.");
+      return;
+    }
+
+    const wordsPerHour = Number.parseInt(wordsInput, 10);
+    const linesPerHour = Number.parseInt(linesInput, 10);
+
+    if (wordsPerHour <= 0 || linesPerHour <= 0) {
+      toast.error("Words/Hour and Lines/Hour must be greater than 0.");
+      return;
+    }
+
     updateRatesMutation.mutate({ userId, wordsPerHour, linesPerHour });
   };
 
@@ -261,6 +298,35 @@ function WorkloadContent() {
     setEditingUserId(null);
     setEditWordsPerHour("");
     setEditLinesPerHour("");
+    setEditRateFocusField("words");
+  };
+
+  const handleEditWordsPerHourChange = useCallback(
+    (value: string) => setEditWordsPerHour(sanitizeDigitsOnly(value)),
+    [sanitizeDigitsOnly]
+  );
+
+  const handleEditLinesPerHourChange = useCallback(
+    (value: string) => setEditLinesPerHour(sanitizeDigitsOnly(value)),
+    [sanitizeDigitsOnly]
+  );
+
+  const handleRateInputKeyDown = (
+    event: React.KeyboardEvent<HTMLInputElement>,
+    userId: string
+  ) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      event.stopPropagation();
+      handleSaveEdit(userId);
+      return;
+    }
+
+    if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      handleCancelEdit();
+    }
   };
 
   const toggleUserExpanded = (userId: string) => {
@@ -814,20 +880,26 @@ function WorkloadContent() {
                               >
                                 {isEditing ?
                                   <input
-                                    type="number"
+                                    type="text"
+                                    inputMode="numeric"
+                                    pattern="[0-9]*"
                                     value={editWordsPerHour}
                                     onChange={(e) =>
-                                      setEditWordsPerHour(e.target.value)
+                                      handleEditWordsPerHourChange(e.target.value)
                                     }
-                                    className="w-20 px-2 py-1 text-sm text-center border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                                    min="1"
+                                    onKeyDown={(e) =>
+                                      handleRateInputKeyDown(e, workload.userId)
+                                    }
+                                    ref={wordsPerHourInputRef}
+                                    className="no-spinner w-20 px-2 py-1 text-sm text-center border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                                   />
                                 : <button
                                     onClick={() =>
                                       handleStartEdit(
                                         workload.userId,
                                         workload.wordsPerHour,
-                                        workload.linesPerHour
+                                        workload.linesPerHour,
+                                        "words"
                                       )
                                     }
                                     className="text-sm text-gray-900 dark:text-white hover:text-blue-500 dark:hover:text-blue-400 cursor-pointer"
@@ -844,13 +916,18 @@ function WorkloadContent() {
                                 {isEditing ?
                                   <div className="flex items-center justify-center gap-2">
                                     <input
-                                      type="number"
+                                      type="text"
+                                      inputMode="numeric"
+                                      pattern="[0-9]*"
                                       value={editLinesPerHour}
                                       onChange={(e) =>
-                                        setEditLinesPerHour(e.target.value)
+                                        handleEditLinesPerHourChange(e.target.value)
                                       }
-                                      className="w-20 px-2 py-1 text-sm text-center border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                                      min="1"
+                                      onKeyDown={(e) =>
+                                        handleRateInputKeyDown(e, workload.userId)
+                                      }
+                                      ref={linesPerHourInputRef}
+                                      className="no-spinner w-20 px-2 py-1 text-sm text-center border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                                     />
                                     <button
                                       onClick={() =>
@@ -875,7 +952,8 @@ function WorkloadContent() {
                                       handleStartEdit(
                                         workload.userId,
                                         workload.wordsPerHour,
-                                        workload.linesPerHour
+                                        workload.linesPerHour,
+                                        "lines"
                                       )
                                     }
                                     className="text-sm text-gray-900 dark:text-white hover:text-blue-500 dark:hover:text-blue-400 cursor-pointer"

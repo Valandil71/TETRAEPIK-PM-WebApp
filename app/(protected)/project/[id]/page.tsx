@@ -631,7 +631,7 @@ export default function ProjectPage() {
             />
           )}
           <ProjectInstructionsCard
-            instructions={project.instructions}
+            instructions={null}
             sapInstructions={project.sap_instructions}
           />
         </div>

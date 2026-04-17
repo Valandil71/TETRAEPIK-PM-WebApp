@@ -307,13 +307,14 @@ export function ManagementTable({
                           <div onClick={(e) => e.stopPropagation()}>
                             {editingProjectId === project.id ?
                               <input
-                                type="number"
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
                                 value={editWords}
                                 onChange={(e) => onEditWordsChange(e.target.value)}
                                 onKeyDown={(e) => handleWordsLinesKeyDown(e, project.id)}
                                 ref={wordsInputRef}
-                                className="w-24 px-3 py-2 text-sm text-right border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                                min="0"
+                                className="no-spinner w-24 px-3 py-2 text-sm text-right border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                               />
                             : <button
                                 onClick={() =>
@@ -337,13 +338,14 @@ export function ManagementTable({
                             {editingProjectId === project.id ?
                               <div className="flex items-center justify-end gap-2">
                                 <input
-                                  type="number"
+                                  type="text"
+                                  inputMode="numeric"
+                                  pattern="[0-9]*"
                                   value={editLines}
                                   onChange={(e) => onEditLinesChange(e.target.value)}
                                   onKeyDown={(e) => handleWordsLinesKeyDown(e, project.id)}
                                   ref={linesInputRef}
-                                  className="w-24 px-3 py-2 text-sm text-right border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                                  min="0"
+                                  className="no-spinner w-24 px-3 py-2 text-sm text-right border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                                 />
                                 <button
                                   onClick={() => onSaveWordsLines(project.id)}
@@ -500,8 +502,6 @@ export function ManagementTable({
     </div>
   );
 }
-
-
 
 
 

@@ -257,23 +257,25 @@ export function ManagementCard({
           <div className="flex items-center gap-2 flex-wrap">
             <span>Words:</span>
             <input
-              type="number"
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
               value={editWords}
               onChange={(e) => onEditWordsChange(e.target.value)}
               onKeyDown={(e) => handleWordsLinesKeyDown(e, project.id)}
               ref={wordsInputRef}
-              className="w-16 px-1.5 py-0.5 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-              min="0"
+              className="no-spinner w-16 px-1.5 py-0.5 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
             />
             <span>Lines:</span>
             <input
-              type="number"
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
               value={editLines}
               onChange={(e) => onEditLinesChange(e.target.value)}
               onKeyDown={(e) => handleWordsLinesKeyDown(e, project.id)}
               ref={linesInputRef}
-              className="w-16 px-1.5 py-0.5 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-              min="0"
+              className="no-spinner w-16 px-1.5 py-0.5 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
             />
             <button
               onClick={() => onSaveWordsLines(project.id)}
@@ -440,8 +442,6 @@ export function ManagementCard({
     </div>
   );
 }
-
-
 
 
 
