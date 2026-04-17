@@ -1,0 +1,24 @@
+﻿# Dependencies
+node_modules/
+
+# Next.js build/dev output
+.next/
+out/
+
+# Generic build output
+build/
+dist/
+
+# TypeScript incremental build info
+*.tsbuildinfo
+
+# Tool caches
+.turbo/
+.cache/
+
+# npm logs
+npm-debug.log*
+
+# .env
+.env.local
+.env*.local
