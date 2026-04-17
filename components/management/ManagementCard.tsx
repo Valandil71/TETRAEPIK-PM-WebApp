@@ -112,7 +112,9 @@ interface ManagementCardProps {
   onMenuToggle: (projectId: string | null) => void;
   onAddTranslator: (projectId: number) => void;
   onRemoveTranslator: (projectId: number) => void;
-  onDuplicate: (projectId: number) => void;
+  onCreateStmProject: (projectId: number) => void;
+  creatingStmProjectId: number | null;
+  isCreatingStmProject: boolean;
   onEditDetails: (projectId: number) => void;
   onCompleteProject: (projectId: number) => void;
   editingProjectId: number | null;
@@ -136,7 +138,9 @@ export function ManagementCard({
   onMenuToggle,
   onAddTranslator,
   onRemoveTranslator,
-  onDuplicate,
+  onCreateStmProject,
+  creatingStmProjectId,
+  isCreatingStmProject,
   onEditDetails,
   onCompleteProject,
   editingProjectId,
@@ -243,7 +247,10 @@ export function ManagementCard({
           }
           onAddTranslator={() => onAddTranslator(project.id)}
           onRemoveTranslator={() => onRemoveTranslator(project.id)}
-          onDuplicate={() => onDuplicate(project.id)}
+          onCreateStmProject={() => onCreateStmProject(project.id)}
+          isCreatingStmProject={
+            isCreatingStmProject && creatingStmProjectId === project.id
+          }
           onEditDetails={() => onEditDetails(project.id)}
           onCompleteProject={() => onCompleteProject(project.id)}
         />
@@ -316,8 +323,7 @@ export function ManagementCard({
 
       <div className="mt-2">
         {project.translators.length > 0 ?
-          <TooltipProvider>
-            <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2">
               {project.translators.map((translator) => {
                 const statusInfo = getStatusIconLocal(translator.assignment_status);
                 const StatusIcon = statusInfo.icon;
@@ -351,7 +357,6 @@ export function ManagementCard({
                 );
               })}
             </div>
-          </TooltipProvider>
         : <span className="text-gray-400 dark:text-gray-500 text-xs italic">
             Not assigned
           </span>
@@ -401,6 +406,7 @@ export function ManagementCard({
   }
 
   return (
+    <TooltipProvider>
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
       {groups.map((group) => {
         if (group.projects.length === 1) {
@@ -440,10 +446,9 @@ export function ManagementCard({
         );
       })}
     </div>
+    </TooltipProvider>
   );
 }
-
-
 
 
 

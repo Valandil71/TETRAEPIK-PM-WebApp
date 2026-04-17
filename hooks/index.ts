@@ -24,6 +24,7 @@ export { useProjectsWithTranslators } from './project/useProjectsWithTranslators
 export { useUpdateProject } from './project/useUpdateProject';
 export { useUpdateAssignment } from './project/useUpdateAssignment';
 export { useProjectFilters } from './project/useProjectFilters';
+export { useProjectListPagination, PROJECT_LIST_ITEMS_PER_PAGE } from './project/useProjectListPagination';
 
 // SAP integration hooks
 export { useSapProjects } from './sap/useSapProjects';

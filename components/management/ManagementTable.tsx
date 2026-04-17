@@ -106,7 +106,9 @@ interface ManagementTableProps {
   onMenuToggle: (projectId: string | null) => void;
   onAddTranslator: (projectId: number) => void;
   onRemoveTranslator: (projectId: number) => void;
-  onDuplicate: (projectId: number) => void;
+  onCreateStmProject: (projectId: number) => void;
+  creatingStmProjectId: number | null;
+  isCreatingStmProject: boolean;
   onEditDetails: (projectId: number) => void;
   onCompleteProject: (projectId: number) => void;
   editingProjectId: number | null;
@@ -135,7 +137,9 @@ export function ManagementTable({
   onMenuToggle,
   onAddTranslator,
   onRemoveTranslator,
-  onDuplicate,
+  onCreateStmProject,
+  creatingStmProjectId,
+  isCreatingStmProject,
   onEditDetails,
   onCompleteProject,
   editingProjectId,
@@ -209,6 +213,7 @@ export function ManagementTable({
   }
 
   return (
+    <TooltipProvider>
     <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden mb-6">
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
@@ -382,8 +387,7 @@ export function ManagementTable({
                         </td>
                         <td className="px-6 py-4">
                           {project.translators.length > 0 ?
-                            <TooltipProvider>
-                              <div className="flex flex-wrap gap-2">
+                            <div className="flex flex-wrap gap-2">
                                 {project.translators.map((translator) => {
                                   const statusInfo = getStatusIconLocal(
                                     translator.assignment_status
@@ -424,7 +428,6 @@ export function ManagementTable({
                                   );
                                 })}
                               </div>
-                            </TooltipProvider>
                           : <span className="text-gray-400 dark:text-gray-500 text-xs italic">
                               Not assigned
                             </span>
@@ -483,7 +486,10 @@ export function ManagementTable({
                               onRemoveTranslator={() =>
                                 onRemoveTranslator(project.id)
                               }
-                              onDuplicate={() => onDuplicate(project.id)}
+                              onCreateStmProject={() => onCreateStmProject(project.id)}
+                              isCreatingStmProject={
+                                isCreatingStmProject && creatingStmProjectId === project.id
+                              }
                               onEditDetails={() => onEditDetails(project.id)}
                               onCompleteProject={() =>
                                 onCompleteProject(project.id)
@@ -500,6 +506,7 @@ export function ManagementTable({
         </table>
       </div>
     </div>
+    </TooltipProvider>
   );
 }
 

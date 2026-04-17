@@ -9,6 +9,7 @@ import { FilterDropdown } from "@/components/general/FilterDropdown";
 import { ViewToggle } from "@/components/general/ViewToggle";
 import { SearchBar } from "@/components/general/SearchBar";
 import { StatusTabs } from "@/components/general/StatusTabs";
+import { Pagination } from "@/components/ui/pagination";
 import { InvoicingTable } from "@/components/invoicing/InvoicingTable";
 import { InvoicingCard } from "@/components/invoicing/InvoicingCard";
 import { ConfirmationDialog } from "@/components/management/ConfirmationDialog";
@@ -26,6 +27,7 @@ import {
   groupProjectsByExactName,
 } from "@/lib/projectGrouping";
 import { useProjectGroupExpansion } from "@/hooks/project/useProjectGroupExpansion";
+import { useProjectListPagination } from "@/hooks/project/useProjectListPagination";
 
 type TabType = "all" | "toBeInvoiced" | "toBePaid";
 type ViewMode = "table" | "card";
@@ -207,9 +209,18 @@ function InvoicingContent() {
     getClosestDeadline,
   ]);
 
+  const {
+    currentPage,
+    totalPages,
+    totalItems,
+    itemsPerPage,
+    paginatedItems: paginatedProjects,
+    setCurrentPage,
+  } = useProjectListPagination(filteredProjects);
+
   const groupedProjects = useMemo(
-    () => groupProjectsByExactName(filteredProjects),
-    [filteredProjects]
+    () => groupProjectsByExactName(paginatedProjects),
+    [paginatedProjects]
   );
 
   const selectedProjectRecords = useMemo(
@@ -614,6 +625,15 @@ function InvoicingContent() {
           onGroupSelection={handleGroupSelection}
         />
       }
+
+      <Pagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onPageChange={setCurrentPage}
+        itemsPerPage={itemsPerPage}
+        totalItems={totalItems}
+        className="mb-6 rounded-2xl border border-gray-200 dark:border-gray-700"
+      />
 
       {/* Confirm Button Bar */}
       {selectedProjects.size > 0 && (

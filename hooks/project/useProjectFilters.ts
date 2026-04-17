@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useDeferredValue } from "react";
 import {
   matchesDueDateFilter,
   matchesLengthFilter,
@@ -31,6 +31,7 @@ export function useProjectFilters<T extends FilterableProject>(projects: T[]) {
   const [sourceLangFilter, setSourceLangFilter] = useState<string | null>(null);
   const [targetLangFilter, setTargetLangFilter] = useState<string | null>(null);
   const [lengthFilter, setLengthFilter] = useState<string | null>(null);
+  const deferredSearchTerm = useDeferredValue(searchTerm);
 
   // Derived unique values for dropdowns
   const uniqueSystems = useMemo(() => {
@@ -74,7 +75,7 @@ export function useProjectFilters<T extends FilterableProject>(projects: T[]) {
   }, []);
 
   const hasActiveFilters =
-    !!searchTerm ||
+    !!deferredSearchTerm ||
     !!systemFilter ||
     !!dueDateFilter ||
     !!assignmentStatusFilter ||
@@ -94,8 +95,8 @@ export function useProjectFilters<T extends FilterableProject>(projects: T[]) {
       let filtered = items;
 
       // Search filter
-      if (searchTerm) {
-        const term = searchTerm.toLowerCase();
+      if (deferredSearchTerm) {
+        const term = deferredSearchTerm.toLowerCase();
         filtered = filtered.filter((p) =>
           p.name.toLowerCase().includes(term)
         );
@@ -155,7 +156,7 @@ export function useProjectFilters<T extends FilterableProject>(projects: T[]) {
       });
     },
     [
-      searchTerm,
+      deferredSearchTerm,
       systemFilter,
       dueDateFilter,
       customDueDate,

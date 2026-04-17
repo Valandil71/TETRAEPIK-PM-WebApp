@@ -12,6 +12,7 @@ import { ViewToggle } from "@/components/general/ViewToggle";
 import { SearchBar } from "@/components/general/SearchBar";
 import { ScrollToTopButton } from "@/components/general/ScrollToTopButton";
 import { StatusTabs } from "@/components/general/StatusTabs";
+import { Pagination } from "@/components/ui/pagination";
 import { ManagementTable } from "@/components/management/ManagementTable";
 import { ManagementCard } from "@/components/management/ManagementCard";
 import { AddTranslatorDialog } from "@/components/management/AddTranslatorDialog";
@@ -36,6 +37,7 @@ import { useLayoutStore } from "@/lib/stores/useLayoutStore";
 import type { SapInstructionEntry } from "@/types/project";
 import { groupProjectsByExactName } from "@/lib/projectGrouping";
 import { useProjectGroupExpansion } from "@/hooks/project/useProjectGroupExpansion";
+import { useProjectListPagination } from "@/hooks/project/useProjectListPagination";
 
 type ProjectStatus = "all" | "ready" | "inProgress" | "unclaimed";
 
@@ -71,6 +73,7 @@ function ProjectManagementContent() {
 
   // State
   const [openMenu, setOpenMenu] = useState<string | null>(null);
+  const [creatingStmProjectId, setCreatingStmProjectId] = useState<number | null>(null);
   const [addTranslatorModal, setAddTranslatorModal] = useState<{
     open: boolean;
     projectId: number;
@@ -263,9 +266,18 @@ function ProjectManagementContent() {
     return projects;
   }, [allProjects, activeTab, categorizedProjects, applyBaseFilters, resolvedProjectTypeFilter]);
 
+  const {
+    currentPage,
+    totalPages,
+    totalItems,
+    itemsPerPage,
+    paginatedItems: paginatedProjects,
+    setCurrentPage,
+  } = useProjectListPagination(filteredProjects);
+
   const groupedProjects = useMemo(
-    () => groupProjectsByExactName(filteredProjects),
-    [filteredProjects]
+    () => groupProjectsByExactName(paginatedProjects),
+    [paginatedProjects]
   );
 
   const groupExpansionMode = useLayoutStore((state) => state.groupExpansionMode);
@@ -493,6 +505,62 @@ function ProjectManagementContent() {
       toast.error(getUserFriendlyError(error, "project management")),
   });
 
+  const createStmProjectMutation = useMutation({
+    mutationFn: async (projectId: number) => {
+      const { data: sourceProject, error: sourceError } = await supabase
+        .from("projects")
+        .select("*")
+        .eq("id", projectId)
+        .single();
+
+      if (sourceError || !sourceProject) {
+        throw new Error(
+          `Failed to load source project: ${sourceError?.message || "Project not found"}`
+        );
+      }
+
+      const { id, created_at, updated_at, ...projectData } = sourceProject;
+      void id;
+      void created_at;
+      void updated_at;
+
+      const { data: newProject, error: createError } = await supabase
+        .from("projects")
+        .insert({
+          ...projectData,
+          system: "STM",
+        })
+        .select("id")
+        .single();
+
+      if (createError || !newProject) {
+        throw new Error(
+          `Failed to create STM project: ${createError?.message || "Unknown error"}`
+        );
+      }
+
+      return newProject;
+    },
+    onMutate: (projectId) => {
+      setCreatingStmProjectId(projectId);
+    },
+    onSuccess: (newProject, projectId) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.projectsWithTranslators() });
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.project(projectId) });
+      toast.success("STM project created successfully. Opening it now.");
+      setOpenMenu(null);
+      router.push(`/project/${newProject.id}`);
+    },
+    onError: (error: Error) => {
+      toast.error(getUserFriendlyError(error, "project creation"));
+      setOpenMenu(null);
+    },
+    onSettled: () => {
+      setCreatingStmProjectId(null);
+    },
+  });
+
   // Handlers for words/lines editing
   const handleStartWordsLinesEdit = (
     projectId: number,
@@ -567,9 +635,8 @@ function ProjectManagementContent() {
     }
   };
 
-  const handleDuplicate = (projectId: number) => {
-    setOpenMenu(null);
-    router.push(`/new-project?duplicateFrom=${projectId}`);
+  const handleCreateStmProject = (projectId: number) => {
+    createStmProjectMutation.mutate(projectId);
   };
 
   const handleEditDetails = (projectId: number) => {
@@ -772,7 +839,9 @@ function ProjectManagementContent() {
           onMenuToggle={setOpenMenu}
           onAddTranslator={handleAddTranslator}
           onRemoveTranslator={handleRemoveTranslator}
-          onDuplicate={handleDuplicate}
+          onCreateStmProject={handleCreateStmProject}
+          creatingStmProjectId={creatingStmProjectId}
+          isCreatingStmProject={createStmProjectMutation.isPending}
           onEditDetails={handleEditDetails}
           onCompleteProject={handleCompleteProject}
           editingProjectId={editingProjectId}
@@ -797,7 +866,9 @@ function ProjectManagementContent() {
           onMenuToggle={setOpenMenu}
           onAddTranslator={handleAddTranslator}
           onRemoveTranslator={handleRemoveTranslator}
-          onDuplicate={handleDuplicate}
+          onCreateStmProject={handleCreateStmProject}
+          creatingStmProjectId={creatingStmProjectId}
+          isCreatingStmProject={createStmProjectMutation.isPending}
           onEditDetails={handleEditDetails}
           onCompleteProject={handleCompleteProject}
           editingProjectId={editingProjectId}
@@ -815,6 +886,15 @@ function ProjectManagementContent() {
           }
         />
       }
+
+      <Pagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onPageChange={setCurrentPage}
+        itemsPerPage={itemsPerPage}
+        totalItems={totalItems}
+        className="mb-6 rounded-2xl border border-gray-200 dark:border-gray-700"
+      />
 
       {/* Modals */}
       <AddTranslatorDialog

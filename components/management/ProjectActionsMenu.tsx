@@ -5,7 +5,8 @@ import {
   CheckCircle,
   UserPlus,
   UserMinus,
-  Copy,
+  FilePlus,
+  Loader2,
   Edit,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -29,7 +30,8 @@ interface ProjectActionsMenuProps {
   onToggle: () => void;
   onAddTranslator: () => void;
   onRemoveTranslator: () => void;
-  onDuplicate: () => void;
+  onCreateStmProject: () => void;
+  isCreatingStmProject?: boolean;
   onEditDetails: () => void;
   onCompleteProject: () => void;
 }
@@ -41,7 +43,8 @@ export function ProjectActionsMenu({
   onToggle,
   onAddTranslator,
   onRemoveTranslator,
-  onDuplicate,
+  onCreateStmProject,
+  isCreatingStmProject = false,
   onEditDetails,
   onCompleteProject,
 }: ProjectActionsMenuProps) {
@@ -114,13 +117,17 @@ export function ProjectActionsMenu({
         </DropdownMenuItem>
         <DropdownMenuItem
           className="cursor-pointer px-4 py-2.5 text-gray-700 dark:text-gray-300 hover:bg-blue-100 dark:hover:bg-gray-700 focus:bg-blue-100 dark:focus:bg-gray-700"
+          disabled={isCreatingStmProject}
           onClick={(e) => {
             e.stopPropagation();
-            onDuplicate();
+            onCreateStmProject();
           }}
         >
-          <Copy className="w-4 h-4 mr-2" />
-          Duplicate Project
+          {isCreatingStmProject ?
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+          : <FilePlus className="w-4 h-4 mr-2" />
+          }
+          {isCreatingStmProject ? "Creating STM..." : "Create STM Project"}
         </DropdownMenuItem>
         <DropdownMenuItem
           className="cursor-pointer px-4 py-2.5 text-gray-700 dark:text-gray-300 hover:bg-blue-100 dark:hover:bg-gray-700 focus:bg-blue-100 dark:focus:bg-gray-700"

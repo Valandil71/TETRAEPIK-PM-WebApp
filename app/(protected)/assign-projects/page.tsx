@@ -8,6 +8,7 @@ import { FilterDropdown } from "@/components/general/FilterDropdown";
 import { MultiSelectFilterDropdown } from "@/components/general/MultiSelectFilterDropdown";
 import { ViewToggle } from "@/components/general/ViewToggle";
 import { ScrollToTopButton } from "@/components/general/ScrollToTopButton";
+import { Pagination } from "@/components/ui/pagination";
 import { ProjectAssignTable } from "@/components/assign/ProjectAssignTable";
 import { ProjectAssignCard } from "@/components/assign/ProjectAssignCard";
 import {
@@ -31,6 +32,7 @@ import {
   groupProjectsByExactName,
 } from "@/lib/projectGrouping";
 import { useProjectGroupExpansion } from "@/hooks/project/useProjectGroupExpansion";
+import { useProjectListPagination } from "@/hooks/project/useProjectListPagination";
 
 const ASSIGN_SELECTION_STORAGE_KEY = "assign-projects:selected-project-ids";
 
@@ -188,9 +190,18 @@ function AssignProjectsContent() {
     return projects;
   }, [allProjects, applyBaseFilters, assignmentFilter, resolvedProjectTypeFilter]);
 
+  const {
+    currentPage,
+    totalPages,
+    totalItems,
+    itemsPerPage,
+    paginatedItems: paginatedProjects,
+    setCurrentPage,
+  } = useProjectListPagination(filteredProjects);
+
   const groupedProjects = useMemo(
-    () => groupProjectsByExactName(filteredProjects),
-    [filteredProjects]
+    () => groupProjectsByExactName(paginatedProjects),
+    [paginatedProjects]
   );
 
   const { expandedGroups, toggleGroup, expandGroup } =
@@ -475,6 +486,15 @@ function AssignProjectsContent() {
           onToggleGroupSelection={handleGroupSelection}
         />
       }
+
+      <Pagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onPageChange={setCurrentPage}
+        itemsPerPage={itemsPerPage}
+        totalItems={totalItems}
+        className="mb-6 rounded-2xl border border-gray-200 dark:border-gray-700"
+      />
 
       {/* Confirm Button Bar */}
       {selectedProjects.size > 0 && (

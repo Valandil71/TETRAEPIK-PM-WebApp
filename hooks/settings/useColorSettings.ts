@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSupabase } from "@/hooks/core/useSupabase";
 import { getBgClass, getTextClass, getColorPreview } from "@/utils/tailwindColors";
@@ -24,6 +25,8 @@ interface ProjectColorLegendParams {
   langOut?: string;
 }
 
+const getLanguageKey = (langIn: string, langOut: string) => `${langIn}\u0000${langOut}`;
+
 export function useColorSettings() {
   const supabase = useSupabase();
 
@@ -44,32 +47,50 @@ export function useColorSettings() {
     staleTime: 10 * 60 * 1000, // 10 minutes - color settings don't change often
   });
 
+  const settingMaps = useMemo(() => {
+    const systems = new Map<string, ColorSettingRow>();
+    const statuses = new Map<string, ColorSettingRow>();
+    const languages = new Map<string, ColorSettingRow>();
+
+    settings.forEach((setting) => {
+      if (setting.category === "system" && setting.system_name) {
+        systems.set(setting.system_name, setting);
+        return;
+      }
+
+      if (setting.category === "status" && setting.status_key) {
+        statuses.set(setting.status_key, setting);
+        return;
+      }
+
+      if (
+        setting.category === "language" &&
+        setting.language_in &&
+        setting.language_out
+      ) {
+        languages.set(
+          getLanguageKey(setting.language_in, setting.language_out),
+          setting
+        );
+      }
+    });
+
+    return { systems, statuses, languages };
+  }, [settings]);
+
   // Get color value (tailwind class like "blue-500") for a system
   function getSystemColor(system: string): string {
-    return (
-      settings.find((s) => s.category === "system" && s.system_name === system)
-        ?.color_value || ""
-    );
+    return settingMaps.systems.get(system)?.color_value || "";
   }
 
   // Get color value for a status
   function getStatusColor(status: string): string {
-    return (
-      settings.find((s) => s.category === "status" && s.status_key === status)
-        ?.color_value || ""
-    );
+    return settingMaps.statuses.get(status)?.color_value || "";
   }
 
   // Get color value for a language pair
   function getLanguageColor(langIn: string, langOut: string): string {
-    return (
-      settings.find(
-        (s) =>
-          s.category === "language" &&
-          s.language_in === langIn &&
-          s.language_out === langOut
-      )?.color_value || ""
-    );
+    return settingMaps.languages.get(getLanguageKey(langIn, langOut))?.color_value || "";
   }
 
   // Get combined legend text for all colors used by a project
@@ -89,9 +110,7 @@ export function useColorSettings() {
       lines.push(normalized);
     };
 
-    const systemSetting = settings.find(
-      (s) => s.category === "system" && s.system_name === (system || "")
-    );
+    const systemSetting = settingMaps.systems.get(system || "");
     if (systemSetting) {
       addLine(
         systemSetting.description ||
@@ -99,9 +118,7 @@ export function useColorSettings() {
       );
     }
 
-    const statusSetting = settings.find(
-      (s) => s.category === "status" && s.status_key === (status || "")
-    );
+    const statusSetting = settingMaps.statuses.get(status || "");
     if (statusSetting) {
       addLine(
         statusSetting.description ||
@@ -109,11 +126,8 @@ export function useColorSettings() {
       );
     }
 
-    const languageSetting = settings.find(
-      (s) =>
-        s.category === "language" &&
-        s.language_in === (langIn || "") &&
-        s.language_out === (langOut || "")
+    const languageSetting = settingMaps.languages.get(
+      getLanguageKey(langIn || "", langOut || "")
     );
     if (languageSetting) {
       addLine(

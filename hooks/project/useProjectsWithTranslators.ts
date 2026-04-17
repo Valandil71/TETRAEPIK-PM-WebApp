@@ -20,6 +20,27 @@ interface ProjectAssignmentRow {
   users: AssignmentUserRow | null;
 }
 
+const PROJECT_LIST_SELECT = `
+  id,
+  name,
+  system,
+  words,
+  lines,
+  initial_deadline,
+  interim_deadline,
+  final_deadline,
+  instructions,
+  sap_instructions,
+  status,
+  language_in,
+  language_out,
+  paid,
+  invoiced,
+  project_type,
+  created_at,
+  updated_at
+`;
+
 export function useProjectsWithTranslators(
   showPast: boolean = false,
   showAll: boolean = false,
@@ -33,7 +54,7 @@ export function useProjectsWithTranslators(
       // Build the query
       let query = supabase
         .from('projects')
-        .select('*')
+        .select(PROJECT_LIST_SELECT)
         .order('created_at', { ascending: false });
 
       // Only filter by active status unless includeAllStatuses is true
