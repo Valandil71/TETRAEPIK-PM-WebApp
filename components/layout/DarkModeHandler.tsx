@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useLayoutStore } from "@/lib/stores/useLayoutStore";
 import { useUser } from "@/hooks/user/useUser";
 import { resolveTheme, type ThemePreference } from "@/hooks/settings/useThemePreference";
+import type { GroupExpansionMode } from "@/lib/stores/useLayoutStore";
 
 export function DarkModeHandler() {
   const { user } = useUser();
@@ -12,7 +13,8 @@ export function DarkModeHandler() {
     setThemePreference, 
     setResolvedDarkMode, 
     resolvedDarkMode,
-    collapsed 
+    collapsed,
+    setGroupExpansionMode,
   } = useLayoutStore();
   
   // Track system preference
@@ -46,6 +48,13 @@ export function DarkModeHandler() {
       setThemePreference(user.theme_preference as ThemePreference);
     }
   }, [user?.theme_preference, setThemePreference]);
+
+  // Sync group expansion preference from user data when it loads
+  useEffect(() => {
+    if (user?.expansion_mode) {
+      setGroupExpansionMode(user.expansion_mode as GroupExpansionMode);
+    }
+  }, [user?.expansion_mode, setGroupExpansionMode]);
 
   // Resolve the actual dark mode based on preference and system setting
   useEffect(() => {

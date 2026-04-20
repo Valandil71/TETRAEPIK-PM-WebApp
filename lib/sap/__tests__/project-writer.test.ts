@@ -41,6 +41,23 @@ describe('buildSapUpdatePayload', () => {
     expect('words' in payload).toBe(false);
     expect('lines' in payload).toBe(false);
   });
+
+  it('can preserve existing SAP instructions by omitting sap_instructions', () => {
+    const payload = buildSapUpdatePayload(
+      {
+        ...baseData,
+        sap_instructions: [
+          {
+            instructionShort: 'Short',
+            instructionLong: 'Long',
+          },
+        ],
+      },
+      { includeSapInstructions: false }
+    );
+
+    expect('sap_instructions' in payload).toBe(false);
+  });
 });
 
 function createSupabaseSequenceMock(results: Array<{ data: unknown; error: unknown }>) {

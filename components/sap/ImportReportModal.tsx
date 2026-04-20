@@ -1,12 +1,20 @@
 "use client";
 
-import { FileText, Plus, Pencil } from "lucide-react";
+import { AlertTriangle, FileText, Plus, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
+
+interface ImportReportWarning {
+  type: "instructions_unavailable";
+  projectId: number;
+  subProjectId: string;
+  projectName: string;
+  message: string;
+}
 
 interface ImportReportData {
   id: number;
   created_at: string;
-  report_type: "manual" | "cron";
+  report_type: "manual";
   new_projects: Array<{
     id: number;
     name: string;
@@ -19,6 +27,7 @@ interface ImportReportData {
     name: string;
     changes: Record<string, { old: unknown; new: unknown }>;
   }>;
+  warnings?: ImportReportWarning[];
   summary: string | null;
 }
 
@@ -40,6 +49,13 @@ export function ImportReportModal({ reports, onDismiss }: ImportReportModalProps
   const allModified = Array.from(
     new Map(
       reports.flatMap(r => r.modified_projects ?? []).map(p => [p.id, p])
+    ).values()
+  );
+  const allWarnings = Array.from(
+    new Map(
+      reports
+        .flatMap(r => r.warnings ?? [])
+        .map(warning => [`${warning.type}-${warning.projectId}-${warning.subProjectId}`, warning])
     ).values()
   );
 
@@ -84,6 +100,14 @@ export function ImportReportModal({ reports, onDismiss }: ImportReportModalProps
               <Pencil className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
               <span className="text-sm font-medium text-amber-700 dark:text-amber-300">
                 {allModified.length} modified project{allModified.length !== 1 ? "s" : ""}
+              </span>
+            </div>
+          )}
+          {allWarnings.length > 0 && (
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-lg">
+              <AlertTriangle className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
+              <span className="text-sm font-medium text-rose-700 dark:text-rose-300">
+                {allWarnings.length} warning{allWarnings.length !== 1 ? "s" : ""}
               </span>
             </div>
           )}
@@ -141,6 +165,27 @@ export function ImportReportModal({ reports, onDismiss }: ImportReportModalProps
                         </div>
                       ))}
                     </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {allWarnings.length > 0 && (
+            <div>
+              <p className="text-xs font-medium text-rose-600 dark:text-rose-400 mb-2">
+                Instructions Not Available
+              </p>
+              <div className="space-y-1">
+                {allWarnings.map((warning, index) => (
+                  <div
+                    key={`${warning.subProjectId}-${index}`}
+                    className="text-xs text-gray-700 dark:text-gray-300 pl-3 py-0.5"
+                  >
+                    <span className="font-medium">{warning.projectName}</span>
+                    <span className="block text-gray-400 pl-2 mt-0.5">
+                      SAP marked this subproject as having instructions, but they could not be fetched. Existing SAP instructions were kept.
+                    </span>
                   </div>
                 ))}
               </div>

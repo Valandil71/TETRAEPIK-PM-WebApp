@@ -1,12 +1,20 @@
 "use client";
 
 import { Check, ChevronDown, ChevronUp, Rows3 } from "lucide-react";
+import { useUser } from "@/hooks/user/useUser";
+import { useGroupExpansionPreference } from "@/hooks/settings/useGroupExpansionPreference";
 import { useLayoutStore } from "@/lib/stores/useLayoutStore";
 import type { GroupExpansionMode } from "@/lib/stores/useLayoutStore";
 
 export function GroupExpansionSettings() {
+  const { user } = useUser();
   const groupExpansionMode = useLayoutStore((state) => state.groupExpansionMode);
-  const setGroupExpansionMode = useLayoutStore((state) => state.setGroupExpansionMode);
+  const { updateGroupExpansionMode, isUpdating } = useGroupExpansionPreference();
+
+  const handleGroupExpansionChange = (mode: GroupExpansionMode) => {
+    if (!user?.id || isUpdating) return;
+    updateGroupExpansionMode({ userId: user.id, mode });
+  };
 
   const options: Array<{
     value: GroupExpansionMode;
@@ -35,7 +43,7 @@ export function GroupExpansionSettings() {
           <Rows3 className="w-6 h-6" /> Group Expansion
         </h2>
         <p className="text-sm text-muted-foreground mt-1">
-          Choose one global behavior for grouped lists in Management, Assign Projects, and Invoicing.
+          Choose how grouped lists open for your account in Management, Assign Projects, and Invoicing.
         </p>
       </div>
 
@@ -48,7 +56,8 @@ export function GroupExpansionSettings() {
             <button
               key={option.value}
               type="button"
-              onClick={() => setGroupExpansionMode(option.value)}
+              onClick={() => handleGroupExpansionChange(option.value)}
+              disabled={isUpdating}
               className={`
                 relative flex items-start gap-3 p-5 rounded-xl border-2 transition-all cursor-pointer text-left
                 ${
@@ -56,6 +65,7 @@ export function GroupExpansionSettings() {
                     "border-blue-500 bg-blue-50 dark:bg-blue-950/30"
                   : "border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800/50"
                 }
+                disabled:opacity-50 disabled:cursor-not-allowed
               `}
             >
               {isSelected && (

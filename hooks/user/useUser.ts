@@ -10,7 +10,7 @@ export function useUser() {
 
   const { data: user, isLoading: loading } = useQuery({
     queryKey: queryKeys.user(),
-    queryFn: async (): Promise<(User & { email: string; theme_preference?: string | null }) | null> => {
+    queryFn: async (): Promise<User | null> => {
       const { data: userData } = await supabase.auth.getUser();
       
       if (!userData.user) {
@@ -19,7 +19,7 @@ export function useUser() {
 
       const { data: userProfile, error } = await supabase
         .from('users')
-        .select('id, name, email, role, C_user, TE_user, short_name, avatar, custom_avatar, theme_preference')
+        .select('id, name, email, role, C_user, TE_user, short_name, avatar, custom_avatar, theme_preference, expansion_mode')
         .eq('id', userData.user.id)
         .single();
 

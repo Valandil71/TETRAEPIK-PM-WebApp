@@ -31,8 +31,6 @@ export { useSapProjects } from './sap/useSapProjects';
 export type { SapProject, SapSubProject } from './sap/useSapProjects';
 export { useSapImportStatus } from './sap/useSapImportStatus';
 export type { SapImportStatusResponse } from './sap/useSapImportStatus';
-export { useSapSubProjectDetails } from './sap/useSapSubProjectDetails';
-export type { SapSubProjectDetails, SapStep, SapVolume, SapEnvironment } from './sap/useSapSubProjectDetails';
 export { useSyncSapProjects } from './sap/useSyncSapProjects';
 export type { SyncSapProjectsRequest, SyncSapProjectsResponse } from './sap/useSyncSapProjects';
 export { useImportReports } from './sap/useImportReports';
@@ -40,6 +38,7 @@ export { useImportReports } from './sap/useImportReports';
 // Settings hooks
 export { useColorSettings } from './settings/useColorSettings';
 export { useDefaultFilters } from './settings/useDefaultFilters';
+export { useGroupExpansionPreference } from './settings/useGroupExpansionPreference';
 export { useInstructionExclusions } from './settings/useInstructionExclusions';
 export { useThemePreference, resolveTheme, type ThemePreference } from './settings/useThemePreference';
 

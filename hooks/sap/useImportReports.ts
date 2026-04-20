@@ -4,11 +4,19 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSupabase } from '@/hooks/core/useSupabase';
 import { queryKeys } from "@/lib/queryKeys";
 
+interface ImportReportWarning {
+  type: "instructions_unavailable";
+  projectId: number;
+  subProjectId: string;
+  projectName: string;
+  message: string;
+}
+
 interface ImportReport {
   id: number;
   created_at: string;
   triggered_by: string | null;
-  report_type: "manual" | "cron";
+  report_type: "manual";
   new_projects: Array<{
     id: number;
     name: string;
@@ -21,6 +29,7 @@ interface ImportReport {
     name: string;
     changes: Record<string, { old: unknown; new: unknown }>;
   }>;
+  warnings?: ImportReportWarning[];
   summary: string | null;
   acknowledged_by: string[];
 }

@@ -12,6 +12,7 @@ import {
 
 interface BuildPayloadOptions {
   includeVolumes?: boolean;
+  includeSapInstructions?: boolean;
 }
 
 /** The set of SAP-owned fields written on insert/update */
@@ -19,7 +20,7 @@ export function buildSapUpdatePayload(
   data: SapProjectForImport,
   options: BuildPayloadOptions = {}
 ) {
-  const { includeVolumes = true } = options;
+  const { includeVolumes = true, includeSapInstructions = true } = options;
 
   const payload = {
     sap_import_key: data.sap_import_key,
@@ -30,7 +31,6 @@ export function buildSapUpdatePayload(
     final_deadline: data.final_deadline,
     system: data.system,
     instructions: data.instructions,
-    sap_instructions: data.sap_instructions,
     sap_pm: data.sap_pm,
     project_type: data.project_type,
     terminology_key: data.terminology_key,
@@ -44,12 +44,16 @@ export function buildSapUpdatePayload(
     last_synced_at: data.last_synced_at,
   };
 
+  const payloadWithInstructions = includeSapInstructions
+    ? { ...payload, sap_instructions: data.sap_instructions }
+    : payload;
+
   if (!includeVolumes) {
-    return payload;
+    return payloadWithInstructions;
   }
 
   return {
-    ...payload,
+    ...payloadWithInstructions,
     words: data.words,
     lines: data.lines,
   };
@@ -176,6 +180,7 @@ export async function updateProjectFromSap(
   supabase: SupabaseClient,
   existingId: number,
   data: SapProjectForImport,
+  options: Pick<BuildPayloadOptions, 'includeSapInstructions'> = {},
 ): Promise<{ error: string | null; changes: ReportChanges }> {
   // Fetch current values for change tracking
   const { data: currentProject } = await supabase
@@ -194,7 +199,10 @@ export async function updateProjectFromSap(
 
   const { error: updateError } = await supabase
     .from('projects')
-    .update(buildSapUpdatePayload(data, { includeVolumes: false }))
+    .update(buildSapUpdatePayload(data, {
+      includeVolumes: false,
+      includeSapInstructions: options.includeSapInstructions,
+    }))
     .eq('id', existingId);
 
   if (updateError) {

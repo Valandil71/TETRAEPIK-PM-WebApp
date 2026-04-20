@@ -225,12 +225,6 @@ export interface SapSubProjectListItem {
   dmName: string;
   pmName: string;
   projectType: string;
-  /** Whether this sub-project already exists in local DB */
-  existsLocally: boolean;
-  /** Local project ID if exists */
-  localProjectId?: number;
-  /** Whether local version needs update (SAP has newer data) */
-  needsUpdate?: boolean;
 }
 
 /** Combined sub-project details (info + instructions) for import preview */
