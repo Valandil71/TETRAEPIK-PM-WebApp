@@ -12,7 +12,12 @@ import {
 import { Button } from "@/components/ui/button";
 import { Clock, Download, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { useSapImportStatus } from "@/hooks/sap/useSapImportStatus";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  formatSapImportCooldownMessage,
+  useSapImportStatus,
+} from "@/hooks/sap/useSapImportStatus";
+import { queryKeys } from "@/lib/queryKeys";
 import { useSapProjects } from "@/hooks/sap/useSapProjects";
 import type { SapProjectsResponse } from "@/hooks/sap/useSapProjects";
 import { useSyncSapProjects } from "@/hooks/sap/useSyncSapProjects";
@@ -46,6 +51,7 @@ export function SapImportDialog({
     enabled: open,
     refetchInterval: open ? 5000 : false,
   });
+  const queryClient = useQueryClient();
   const {
     refetch: fetchProjects,
     isFetching: isFetchingProjects,
@@ -96,6 +102,18 @@ export function SapImportDialog({
   const handleConfirmImport = async () => {
     if (isImportRunning || isBusy) return;
 
+    const latestStatus = await refetchStatus();
+    const cooldown = latestStatus.data?.cooldown;
+    if (cooldown?.isActive) {
+      toast.info(formatSapImportCooldownMessage(cooldown), { duration: 6000 });
+      return;
+    }
+
+    queryClient.setQueryData(queryKeys.sapImportStatus(), {
+      ...(latestStatus.data ?? importStatus),
+      status: "running",
+      startedAt: new Date().toISOString(),
+    });
     showProcessingNotice();
     onOpenChange(false);
 
@@ -109,12 +127,14 @@ export function SapImportDialog({
       if (allSubProjects.length === 0) {
         toast.info("No SAP subprojects are available to import.");
         closeProcessingNotice();
+        refetchStatus();
         return;
       }
 
       await syncMutation.mutateAsync(allSubProjects);
       refetchStatus();
     } catch (error) {
+      closeProcessingNotice();
       if (!(error instanceof Error)) {
         toast.error("Failed to start the SAP import");
       }

@@ -25,13 +25,15 @@ function buildStep(params: {
   contentId: string;
   slsLang: string;
   sourceLang?: string;
+  serviceStep?: string;
+  stepText?: string;
   endDate: string;
   volumes?: Array<{ volumeUnit: string; volumeQuantity: number; ceBillQuantity?: number }>;
 }): SapStep {
   return {
     contentId: params.contentId,
-    serviceStep: 'TRANSLFWL',
-    stepText: 'Translate final volume',
+    serviceStep: params.serviceStep ?? 'TRANSLFWL',
+    stepText: params.stepText ?? 'Translate final volume',
     slsLang: params.slsLang,
     sourceLang: params.sourceLang ?? 'enUS',
     tGroup: 'TE',
@@ -174,5 +176,70 @@ describe('mapSapSubProjectToProjects', () => {
     expect(projects[0].graph_id).toEqual(['00051', '00117']);
     expect(projects[0].words).toBe(132);
     expect(projects[0].final_deadline).toBe('2026-05-18T13:00:00.000Z');
+  });
+
+  it('splits a project with both initial and final deadlines into two import projects', () => {
+    const details: SapSubProjectInfo = {
+      subProjectId: '9010-27',
+      subProjectName: 'Process_Insights_UI_2604',
+      terminologyKey: [],
+      environment: [
+        {
+          contentId: '000001',
+          environmentName: 'XTM for Product',
+          toolType: 'XTM_PM',
+          toolTypeDescription: 'XTM for Product',
+          projectUrl: '3577469140',
+          graphId: [],
+          lxeProject: [],
+          translationArea: [],
+          worklist: [],
+          is_xtm: true,
+          content_name: 'Process_Insights_UI_2603',
+          external_project_id: '0000000000',
+          external_system: '',
+        },
+      ],
+      subProjectSteps: [
+        buildStep({
+          contentId: '000001',
+          slsLang: 'ptPT',
+          serviceStep: 'TRANSLFWL',
+          stepText: 'Translate final volume',
+          endDate: '2026-04-27T16:00:00.000Z',
+        }),
+        buildStep({
+          contentId: '000001',
+          slsLang: 'ptPT',
+          serviceStep: 'TRANSLREGU',
+          stepText: 'Translate current volume',
+          endDate: '2026-04-23T10:00:00.000Z',
+        }),
+      ],
+    };
+
+    const projects = mapSapSubProjectToProjects(
+      buildSubProject('9010-27', 'Process_Insights_UI_2604'),
+      buildParent(9010, 'Process Insights'),
+      details,
+      []
+    );
+
+    expect(projects).toHaveLength(2);
+    expect(projects.map((project) => project.name)).toEqual([
+      '9010-27: Process Insights | Process_Insights_UI_2604',
+      '9010-27: Process Insights | Process_Insights_UI_2604',
+    ]);
+
+    const finalProject = projects.find((project) => project.final_deadline);
+    const initialProject = projects.find((project) => project.initial_deadline);
+
+    expect(finalProject?.sap_import_key).toBe('STD|XTM|enUS|ptPT|LANGPAIR|DEADLINE|FINAL');
+    expect(finalProject?.initial_deadline).toBeNull();
+    expect(finalProject?.final_deadline).toBe('2026-04-27T13:00:00.000Z');
+
+    expect(initialProject?.sap_import_key).toBe('STD|XTM|enUS|ptPT|LANGPAIR|DEADLINE|INITIAL');
+    expect(initialProject?.initial_deadline).toBe('2026-04-23T07:00:00.000Z');
+    expect(initialProject?.final_deadline).toBeNull();
   });
 });

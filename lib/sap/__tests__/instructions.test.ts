@@ -60,7 +60,7 @@ describe('instruction normalization', () => {
     expect(visible[0].long).toBe('Keep this');
   });
 
-  it('does not include Terms in composed instructions', () => {
+  it('does not include terms or hours in composed instructions', () => {
     const composed = buildInstructions({
       translationAreas: ['000053'],
       lxeProjects: [],
@@ -73,7 +73,7 @@ describe('instruction normalization', () => {
     });
 
     expect(composed).toContain('TA: 000053');
-    expect(composed).toContain('Hours: 2');
     expect(composed).not.toContain('Terms:');
+    expect(composed).not.toContain('Hours:');
   });
 });

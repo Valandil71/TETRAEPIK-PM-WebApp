@@ -6,7 +6,7 @@ import { normalizeInstructionText, normalizeInstructionTextForMatch } from './in
 
 /**
  * Build composed instructions string from extracted fields.
- * Order: TA, lxe/DITA (if DNW), Graph ID, Hours (if exist/=0), TK, WL
+ * Order: TA, lxe/DITA (if DNW), Graph ID, TK, WL
  */
 export function buildInstructions(params: {
   translationAreas: string[];
@@ -31,10 +31,6 @@ export function buildInstructions(params: {
 
   if (params.graphIds.length > 0) {
     parts.push(`Graph ID: ${params.graphIds.join(', ')}`);
-  }
-
-  if (params.hours !== 0) {
-    parts.push(`Hours: ${params.hours}`);
   }
 
   if (params.terminologyKeys.length > 0) {

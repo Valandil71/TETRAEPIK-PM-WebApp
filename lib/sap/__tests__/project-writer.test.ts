@@ -61,6 +61,38 @@ function createSupabaseSequenceMock(results: Array<{ data: unknown; error: unkno
 }
 
 describe('findExistingProject', () => {
+  it('does not use legacy fallbacks for initial deadline split projects', async () => {
+    const supabase = createSupabaseSequenceMock([
+      { data: null, error: null }, // exact maybeSingle
+      { data: [{ id: 10 }], error: null }, // would match if fallback ran
+    ]);
+
+    const result = await findExistingProject(supabase as never, {
+      ...baseData,
+      sap_import_key: 'k1|DEADLINE|INITIAL',
+      initial_deadline: '2026-04-23T07:00:00.000Z',
+    });
+
+    expect(result.error).toBeNull();
+    expect(result.data).toBeNull();
+  });
+
+  it('matches final deadline split projects to the previous unsplit import key', async () => {
+    const supabase = createSupabaseSequenceMock([
+      { data: null, error: null }, // exact maybeSingle
+      { data: { id: 20 }, error: null }, // unsplit import key maybeSingle
+    ]);
+
+    const result = await findExistingProject(supabase as never, {
+      ...baseData,
+      sap_import_key: 'k1|DEADLINE|FINAL',
+      final_deadline: '2026-04-27T13:00:00.000Z',
+    });
+
+    expect(result.error).toBeNull();
+    expect(result.data).toEqual({ id: 20 });
+  });
+
   it('uses compatibility fallback when exact and legacy match fail', async () => {
     const supabase = createSupabaseSequenceMock([
       { data: null, error: null }, // exact maybeSingle

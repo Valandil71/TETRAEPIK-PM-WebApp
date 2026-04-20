@@ -5,7 +5,10 @@ import { useRouter, usePathname } from "next/navigation";
 import { X, Loader2, AlertCircle, Download, FileDown } from "lucide-react";
 import { useUser } from "@/hooks/user/useUser";
 import { useProjectsWithTranslators } from "@/hooks/project/useProjectsWithTranslators";
-import { useSapImportStatus } from "@/hooks/sap/useSapImportStatus";
+import {
+  formatSapImportCooldownMessage,
+  useSapImportStatus,
+} from "@/hooks/sap/useSapImportStatus";
 import { FilterDropdown } from "@/components/general/FilterDropdown";
 import { MultiSelectFilterDropdown } from "@/components/general/MultiSelectFilterDropdown";
 import { ViewToggle } from "@/components/general/ViewToggle";
@@ -52,7 +55,10 @@ export default function ProjectManagementPage() {
 function ProjectManagementContent() {
   const router = useRouter();
   const { user, loading: userLoading } = useUser();
-  const { data: sapImportStatus } = useSapImportStatus({ refetchInterval: 5000 });
+  const {
+    data: sapImportStatus,
+    refetch: refetchSapImportStatus,
+  } = useSapImportStatus({ refetchInterval: 5000 });
   const queryClient = useQueryClient();
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -67,6 +73,18 @@ function ProjectManagementContent() {
   const isSapImportRunning = sapImportStatus?.status === "running";
 
   const supabase = createBrowserClient(supabaseUrl, supabaseKey);
+
+  const handleOpenSapImportDialog = async () => {
+    const latestStatus = await refetchSapImportStatus();
+    const cooldown = latestStatus.data?.cooldown ?? sapImportStatus?.cooldown;
+
+    if (cooldown?.isActive) {
+      toast.info(formatSapImportCooldownMessage(cooldown), { duration: 6000 });
+      return;
+    }
+
+    setSapImportDialogOpen(true);
+  };
 
   // Persisted state via Zustand store
   const { activeTab, setActiveTab, viewMode, setViewMode } = useManagementPageStore();
@@ -718,7 +736,7 @@ function ProjectManagementContent() {
             Export CSV
           </Button>
           <Button
-            onClick={() => setSapImportDialogOpen(true)}
+            onClick={handleOpenSapImportDialog}
             disabled={isSapImportRunning}
             className="bg-blue-500 hover:bg-blue-600 text-white"
           >

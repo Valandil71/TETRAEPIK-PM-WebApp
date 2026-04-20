@@ -9,6 +9,11 @@ export interface SapImportStatusResponse {
   startedAt: string | null;
   finishedAt: string | null;
   startedBy: string | null;
+  cooldown: {
+    isActive: boolean;
+    waitMinutes: number | null;
+    retryAt: string | null;
+  };
 }
 
 interface UseSapImportStatusOptions {
@@ -25,4 +30,22 @@ export function useSapImportStatus(options: UseSapImportStatusOptions = {}) {
     enabled,
     refetchInterval,
   });
+}
+
+export function formatSapImportCooldownMessage(
+  cooldown: SapImportStatusResponse["cooldown"]
+): string {
+  if (!cooldown.retryAt) {
+    return "Import is on cooldown. Please try again in a few minutes.";
+  }
+
+  const retryTime = new Date(cooldown.retryAt).toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const waitText = cooldown.waitMinutes
+    ? ` (~${cooldown.waitMinutes} min)`
+    : "";
+
+  return `Import is on cooldown. Available again at ${retryTime}${waitText}.`;
 }

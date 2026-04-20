@@ -24,6 +24,7 @@ import { buildInstructions, buildSapInstructions } from './instructions';
 import { sanitizeString } from './mappers';
 import { isBlockedSapProjectType } from './project-type-rules';
 import { SAP_DEADLINE_OFFSET_HOURS } from './constants';
+import { appendDeadlineVariantToImportKey } from './import-keys';
 
 function applyDeadlineOffset(isoDate: string | null | undefined): string | null {
   if (!isoDate) return null;
@@ -181,6 +182,32 @@ function buildSapImportKey(params: {
   return [...base, 'LANGPAIR'].join('|');
 }
 
+function splitProjectByDeadline(project: SapProjectForImport): SapProjectForImport[] {
+  if (!project.initial_deadline || !project.final_deadline) {
+    return [project];
+  }
+
+  return [
+    {
+      ...project,
+      sap_import_key: appendDeadlineVariantToImportKey(project.sap_import_key, 'FINAL'),
+      initial_deadline: null,
+    },
+    {
+      ...project,
+      sap_import_key: appendDeadlineVariantToImportKey(project.sap_import_key, 'INITIAL'),
+      final_deadline: null,
+    },
+  ];
+}
+
+function pushDeadlineSplitProjects(
+  results: SapProjectForImport[],
+  project: SapProjectForImport
+): void {
+  results.push(...splitProjectByDeadline(project));
+}
+
 /**
  * Map SAP subproject data to one or more import-ready projects.
  * Returns array because some systems generate multiple projects per subproject.
@@ -266,7 +293,7 @@ export function mapSapSubProjectToProjects(
 
         if (allInPast) continue;
 
-        results.push({
+        pushDeadlineSplitProjects(results, {
           sap_subproject_id: subProject.subProjectId,
           sap_import_key: buildSapImportKey({
             mode: 'STD',
@@ -400,7 +427,7 @@ export function mapSapSubProjectToProjects(
 
       if (allInPast) continue;
 
-      results.push({
+      pushDeadlineSplitProjects(results, {
         sap_subproject_id: subProject.subProjectId,
         sap_import_key: buildSapImportKey({
           mode: 'STD',

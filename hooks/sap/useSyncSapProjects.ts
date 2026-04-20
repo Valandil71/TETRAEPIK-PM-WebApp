@@ -123,9 +123,9 @@ export function useSyncSapProjects() {
 
       }
 
-      if (data.reportCreated === false) {
+      if (data.reportCreated === false && data.reportCreationError) {
         toast.error(
-          `The import finished, but the report could not be created, so the report modal will not appear. Reason: ${data.reportCreationError || "Unknown error"}`,
+          `The import finished, but the report could not be created, so the report modal will not appear. Reason: ${data.reportCreationError}`,
           { duration: 8000 }
         );
       }

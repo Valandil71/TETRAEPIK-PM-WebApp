@@ -5,6 +5,10 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { SapProjectForImport } from '@/types/sap';
 import { TRACKED_FIELDS } from './constants';
 import { collectTrackedChanges, type ReportChanges } from './sync-utils';
+import {
+  getDeadlineVariantFromImportKey,
+  stripDeadlineVariantFromImportKey,
+} from './import-keys';
 
 interface BuildPayloadOptions {
   includeVolumes?: boolean;
@@ -70,6 +74,25 @@ export async function findExistingProject(
   if (exactMatch.error) return exactMatch;
   if (exactMatch.data) return exactMatch;
 
+  const deadlineVariant = getDeadlineVariantFromImportKey(data.sap_import_key);
+
+  if (deadlineVariant === 'INITIAL') {
+    return { data: null, error: null };
+  }
+
+  if (deadlineVariant === 'FINAL') {
+    const unsplitImportKey = stripDeadlineVariantFromImportKey(data.sap_import_key);
+    const unsplitMatch = await supabase
+      .from('projects')
+      .select('id')
+      .eq('sap_subproject_id', data.sap_subproject_id)
+      .eq('sap_import_key', unsplitImportKey)
+      .maybeSingle();
+
+    if (unsplitMatch.error) return unsplitMatch;
+    if (unsplitMatch.data) return unsplitMatch;
+  }
+
   // Legacy fallback: match by system + languages when import key is null
   let legacyQuery = supabase
     .from('projects')
@@ -102,6 +125,10 @@ export async function findExistingProject(
 
   if ((legacyMatches.data?.length || 0) === 1) {
     return { data: legacyMatches.data![0], error: null };
+  }
+
+  if (deadlineVariant === 'FINAL') {
+    return { data: null, error: null };
   }
 
   // Compatibility fallback:
