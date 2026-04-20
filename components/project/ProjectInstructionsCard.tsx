@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { FileText, ClipboardList, ChevronDown, ChevronRight } from "lucide-react";
+import { FileText, ClipboardList, ChevronDown, ChevronRight, Ban } from "lucide-react";
 import type { SapInstructionEntry } from "@/types/project";
 import { useInstructionExclusions } from "@/hooks/settings/useInstructionExclusions";
 import { filterSapInstructions } from "@/lib/sap/instruction-exclusions";
+import { useRoleAccess } from "@/hooks/user/useRoleAccess";
 
 interface ProjectInstructionsCardProps {
   instructions: string | null | undefined;
@@ -15,10 +16,21 @@ export function ProjectInstructionsCard({
   instructions,
   sapInstructions,
 }: ProjectInstructionsCardProps) {
-  const { exclusionSet } = useInstructionExclusions(null);
+  const { user, isPmOrAdmin } = useRoleAccess();
+  const {
+    exclusionSet,
+    addExclusion,
+    isAdding,
+  } = useInstructionExclusions(user?.id ?? null);
   const visibleSapInstructions = filterSapInstructions(sapInstructions, exclusionSet);
   const hasInstructions = instructions && instructions.trim() !== "";
   const hasSapInstructions = visibleSapInstructions.length > 0;
+  const canExcludeSapInstructions = isPmOrAdmin() && !!user?.id;
+
+  const handleExcludeSapInstruction = (text: string) => {
+    if (!canExcludeSapInstructions || isAdding) return;
+    addExclusion(text);
+  };
 
   if (!hasInstructions && !hasSapInstructions) {
     return (
@@ -36,7 +48,12 @@ export function ProjectInstructionsCard({
   return (
     <div className="space-y-6">
       {hasSapInstructions && (
-        <SapInstructionsSection entries={visibleSapInstructions} />
+        <SapInstructionsSection
+          entries={visibleSapInstructions}
+          canExclude={canExcludeSapInstructions}
+          isExcluding={isAdding}
+          onExclude={handleExcludeSapInstruction}
+        />
       )}
 
       {hasInstructions && (
@@ -58,65 +75,116 @@ export function ProjectInstructionsCard({
   );
 }
 
-function SapInstructionsSection({ entries }: { entries: Array<{ short: string; long: string; slsLang?: string }> }) {
+function SapInstructionsSection({
+  entries,
+  canExclude,
+  isExcluding,
+  onExclude,
+}: {
+  entries: Array<{ short: string; long: string; slsLang?: string }>;
+  canExclude: boolean;
+  isExcluding: boolean;
+  onExclude: (text: string) => void;
+}) {
   if (entries.length === 0) return null;
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-6">
-      <div className="flex items-center gap-3 mb-4">
-        <div className="w-8 h-8 bg-amber-100 dark:bg-amber-900/30 rounded-lg flex items-center justify-center">
-          <FileText className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-        </div>
-        <div>
-          <h2 className="text-gray-900 dark:text-white text-xl font-semibold">
-            SAP Instructions
-          </h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            (read-only)
-          </p>
-        </div>
+      <div className="flex items-center gap-2 mb-3">
+        <FileText className="w-5 h-5 text-amber-500" />
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+          SAP Instructions ({entries.length})
+        </h2>
       </div>
       <div className="space-y-2">
         {entries.map((entry, i) => (
-          <CollapsibleInstruction key={i} short={entry.short} long={entry.long} slsLang={entry.slsLang} />
+          <CollapsibleInstruction
+            key={i}
+            short={entry.short}
+            long={entry.long}
+            slsLang={entry.slsLang}
+            canExclude={canExclude}
+            isExcluding={isExcluding}
+            onExclude={onExclude}
+          />
         ))}
       </div>
     </div>
   );
 }
 
-function CollapsibleInstruction({ short, long }: { short: string; long: string; slsLang?: string }) {
+function CollapsibleInstruction({
+  short,
+  long,
+  canExclude,
+  isExcluding,
+  onExclude,
+}: {
+  short: string;
+  long: string;
+  slsLang?: string;
+  canExclude: boolean;
+  isExcluding: boolean;
+  onExclude: (text: string) => void;
+}) {
   const [expanded, setExpanded] = useState(false);
   const fullText = long || short;
   const isLong = fullText.length > 80;
+  const excludeButton = canExclude ? (
+    <button
+      type="button"
+      onClick={(event) => {
+        event.stopPropagation();
+        onExclude(fullText);
+      }}
+      disabled={isExcluding}
+      className="inline-flex shrink-0 items-center gap-1 rounded-md border border-amber-200 dark:border-amber-800/50 px-2 py-1 text-xs font-medium text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/30 disabled:cursor-not-allowed disabled:opacity-50"
+    >
+      <Ban className="h-3 w-3" />
+      Exclude
+    </button>
+  ) : null;
 
   if (!isLong) {
     return (
-      <div className="bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-100 dark:border-gray-700 p-4">
-        <p className="text-sm text-gray-700 dark:text-gray-300 break-words" style={{ overflowWrap: "anywhere" }}>
-          {fullText}
-        </p>
+      <div className="bg-amber-50 dark:bg-amber-900/10 rounded-lg border border-amber-100 dark:border-amber-800/30 p-3">
+        <div className="flex items-start justify-between gap-3">
+          <p className="text-sm text-gray-700 dark:text-gray-300 break-words" style={{ overflowWrap: "anywhere" }}>
+            {fullText}
+          </p>
+          {excludeButton}
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-100 dark:border-gray-700">
-      <button
-        type="button"
+    <div className="bg-amber-50 dark:bg-amber-900/10 rounded-lg border border-amber-100 dark:border-amber-800/30">
+      <div
+        role="button"
+        tabIndex={0}
         onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-start gap-2 p-4 text-left cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            setExpanded(!expanded);
+          }
+        }}
+        className="flex cursor-pointer items-stretch justify-between gap-3 p-3 hover:bg-amber-100/50 dark:hover:bg-amber-900/20 transition-colors"
       >
-        {expanded ?
-          <ChevronDown className="w-4 h-4 mt-0.5 text-amber-500 shrink-0" />
-        : <ChevronRight className="w-4 h-4 mt-0.5 text-amber-500 shrink-0" />
-        }
-        <span className="text-sm text-gray-700 dark:text-gray-300 break-words" style={{ overflowWrap: "anywhere" }}>
-          {short || fullText.slice(0, 80) + "..."}
+        <span className="flex min-w-0 flex-1 items-start gap-2 text-left">
+          {expanded ?
+            <ChevronDown className="w-3.5 h-3.5 mt-0.5 text-amber-500 shrink-0" />
+          : <ChevronRight className="w-3.5 h-3.5 mt-0.5 text-amber-500 shrink-0" />
+          }
+          <span className="text-sm text-gray-700 dark:text-gray-300 break-words" style={{ overflowWrap: "anywhere" }}>
+            {short || fullText.slice(0, 80) + "..."}
+          </span>
         </span>
-      </button>
+        {excludeButton}
+      </div>
       {expanded && (
-        <div className="px-4 pb-4 pt-0">
+        <div className="px-3 pb-3 pt-0">
           <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-line break-words" style={{ overflowWrap: "anywhere" }}>
             {fullText}
           </p>

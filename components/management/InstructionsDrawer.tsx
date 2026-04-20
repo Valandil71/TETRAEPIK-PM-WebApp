@@ -6,11 +6,12 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { FileText, ClipboardList, ChevronDown, ChevronRight } from "lucide-react";
+import { FileText, ClipboardList, ChevronDown, ChevronRight, Ban } from "lucide-react";
 import { useState } from "react";
 import type { SapInstructionEntry } from "@/types/project";
 import { useInstructionExclusions } from "@/hooks/settings/useInstructionExclusions";
 import { filterSapInstructions } from "@/lib/sap/instruction-exclusions";
+import { useRoleAccess } from "@/hooks/user/useRoleAccess";
 
 interface InstructionsDrawerProject {
   name: string;
@@ -30,12 +31,23 @@ export function InstructionsDrawer({
   project,
 }: InstructionsDrawerProps) {
   const [sapExpanded, setSapExpanded] = useState(false);
-  const { exclusionSet } = useInstructionExclusions(null);
+  const { user, isPmOrAdmin } = useRoleAccess();
+  const {
+    exclusionSet,
+    addExclusion,
+    isAdding,
+  } = useInstructionExclusions(user?.id ?? null);
 
   if (!project) return null;
 
   const hasInstructions = project.instructions && project.instructions.trim() !== "";
   const visibleSapInstructions = filterSapInstructions(project.sap_instructions, exclusionSet);
+  const canExcludeSapInstructions = isPmOrAdmin() && !!user?.id;
+
+  const handleExcludeSapInstruction = (text: string) => {
+    if (!canExcludeSapInstructions || isAdding) return;
+    addExclusion(text);
+  };
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -66,7 +78,15 @@ export function InstructionsDrawer({
               {sapExpanded && (
                 <div className="space-y-2">
                   {visibleSapInstructions.map((entry, i) => (
-                    <CollapsibleSapInstruction key={i} short={entry.short} long={entry.long} slsLang={entry.slsLang} />
+                    <CollapsibleSapInstruction
+                      key={i}
+                      short={entry.short}
+                      long={entry.long}
+                      slsLang={entry.slsLang}
+                      canExclude={canExcludeSapInstructions}
+                      isExcluding={isAdding}
+                      onExclude={handleExcludeSapInstruction}
+                    />
                   ))}
                 </div>
               )}
@@ -100,36 +120,76 @@ export function InstructionsDrawer({
   );
 }
 
-function CollapsibleSapInstruction({ short, long }: { short: string; long: string; slsLang?: string }) {
+function CollapsibleSapInstruction({
+  short,
+  long,
+  canExclude,
+  isExcluding,
+  onExclude,
+}: {
+  short: string;
+  long: string;
+  slsLang?: string;
+  canExclude: boolean;
+  isExcluding: boolean;
+  onExclude: (text: string) => void;
+}) {
   const [expanded, setExpanded] = useState(false);
   const fullText = long || short;
   const isLong = fullText.length > 80;
+  const excludeButton = canExclude ? (
+    <button
+      type="button"
+      onClick={(event) => {
+        event.stopPropagation();
+        onExclude(fullText);
+      }}
+      disabled={isExcluding}
+      className="inline-flex shrink-0 items-center gap-1 rounded-md border border-amber-200 dark:border-amber-800/50 px-2 py-1 text-xs font-medium text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/30 disabled:cursor-not-allowed disabled:opacity-50"
+    >
+      <Ban className="h-3 w-3" />
+      Exclude
+    </button>
+  ) : null;
 
   if (!isLong) {
     return (
       <div className="bg-amber-50 dark:bg-amber-900/10 rounded-lg border border-amber-100 dark:border-amber-800/30 p-3">
-        <p className="text-sm text-gray-700 dark:text-gray-300 break-words" style={{ overflowWrap: "anywhere" }}>
-          {fullText}
-        </p>
+        <div className="flex items-start justify-between gap-3">
+          <p className="text-sm text-gray-700 dark:text-gray-300 break-words" style={{ overflowWrap: "anywhere" }}>
+            {fullText}
+          </p>
+          {excludeButton}
+        </div>
       </div>
     );
   }
 
   return (
     <div className="bg-amber-50 dark:bg-amber-900/10 rounded-lg border border-amber-100 dark:border-amber-800/30">
-      <button
-        type="button"
+      <div
+        role="button"
+        tabIndex={0}
         onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-start gap-2 p-3 text-left cursor-pointer hover:bg-amber-100/50 dark:hover:bg-amber-900/20 transition-colors"
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            setExpanded(!expanded);
+          }
+        }}
+        className="flex cursor-pointer items-stretch justify-between gap-3 p-3 hover:bg-amber-100/50 dark:hover:bg-amber-900/20 transition-colors"
       >
-        {expanded ?
-          <ChevronDown className="w-3.5 h-3.5 mt-0.5 text-amber-500 shrink-0" />
-        : <ChevronRight className="w-3.5 h-3.5 mt-0.5 text-amber-500 shrink-0" />
-        }
-        <span className="text-sm text-gray-700 dark:text-gray-300 break-words" style={{ overflowWrap: "anywhere" }}>
-          {short || fullText.slice(0, 80) + "..."}
+        <span className="flex min-w-0 flex-1 items-start gap-2 text-left">
+          {expanded ?
+            <ChevronDown className="w-3.5 h-3.5 mt-0.5 text-amber-500 shrink-0" />
+          : <ChevronRight className="w-3.5 h-3.5 mt-0.5 text-amber-500 shrink-0" />
+          }
+          <span className="text-sm text-gray-700 dark:text-gray-300 break-words" style={{ overflowWrap: "anywhere" }}>
+            {short || fullText.slice(0, 80) + "..."}
+          </span>
         </span>
-      </button>
+        {excludeButton}
+      </div>
       {expanded && (
         <div className="px-3 pb-3 pt-0">
           <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-line break-words" style={{ overflowWrap: "anywhere" }}>
