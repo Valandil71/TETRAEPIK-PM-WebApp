@@ -61,7 +61,7 @@ export function InstructionExclusionSettings({
             Instruction Exclusions
           </h2>
           <p className="text-sm text-muted-foreground mt-1">
-            Global list: matching SAP instructions are hidden in the UI, but still imported and stored.
+            Global list: matching SAP instructions are hidden for everyone.
           </p>
         </div>
 
