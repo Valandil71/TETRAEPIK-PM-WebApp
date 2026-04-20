@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Check, X } from "lucide-react";
+import { Check, Info, X } from "lucide-react";
 import { formatNumber, formatProjectName } from "@/utils/formatters";
 import { useColorSettings } from "@/hooks/settings/useColorSettings";
 import { getSystemColorStyle, getLanguageColorStyle } from "@/utils/projectTableHelpers";
@@ -116,6 +116,19 @@ export function MyProjectsCard({
             <p className="text-gray-500 dark:text-gray-400 text-sm max-w-xs truncate mb-4">
               {project.instructions || "-"}
             </p>
+            {activeTab === "inProgress" && assignment.initial_message && (
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 mb-4 flex gap-2">
+                <Info className="w-4 h-4 text-blue-500 dark:text-blue-400 shrink-0 mt-0.5" />
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-blue-600 dark:text-blue-400 mb-1 uppercase">
+                    Info from PM
+                  </p>
+                  <p className="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-words line-clamp-4">
+                    {assignment.initial_message}
+                  </p>
+                </div>
+              </div>
+            )}
             {activeTab === "unclaimed" ?
               <div className="flex gap-2 group-hover:scale-110 group-hover:opacity-100 opacity-90 transition-all duration-200">
                 <button

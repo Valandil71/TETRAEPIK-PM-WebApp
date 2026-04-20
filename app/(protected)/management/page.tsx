@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { X, Loader2, AlertCircle, Download, FileDown } from "lucide-react";
 import { useUser } from "@/hooks/user/useUser";
 import { useProjectsWithTranslators } from "@/hooks/project/useProjectsWithTranslators";
@@ -41,6 +41,11 @@ import type { SapInstructionEntry } from "@/types/project";
 import { groupProjectsByExactName } from "@/lib/projectGrouping";
 import { useProjectGroupExpansion } from "@/hooks/project/useProjectGroupExpansion";
 import { useProjectListPagination } from "@/hooks/project/useProjectListPagination";
+import { useWindowScrollMemory } from "@/hooks/ui/useWindowScrollMemory";
+import {
+  restoreElementIntoView,
+  restoreWindowScrollY,
+} from "@/utils/scrollRestoration";
 
 type ProjectStatus = "all" | "ready" | "inProgress" | "unclaimed";
 
@@ -87,7 +92,30 @@ function ProjectManagementContent() {
   };
 
   // Persisted state via Zustand store
-  const { activeTab, setActiveTab, viewMode, setViewMode } = useManagementPageStore();
+  const {
+    activeTab,
+    setActiveTab,
+    viewMode,
+    setViewMode,
+    currentPage: storedCurrentPage,
+    setCurrentPage: setStoredCurrentPage,
+    returnProjectId,
+    shouldScrollToTop,
+    scrollY: storedScrollY,
+    filters: storedFilters,
+    projectTypeFilterOverride,
+    rememberReturnProject,
+    clearReturnProject,
+    clearScrollToTop,
+    setScrollY: setStoredScrollY,
+    setFilters: setStoredFilters,
+    setProjectTypeFilterOverride,
+  } = useManagementPageStore();
+  const hasRestoredSessionScroll = useRef(false);
+  useWindowScrollMemory({
+    scrollY: storedScrollY,
+    setScrollY: setStoredScrollY,
+  });
 
   // State
   const [openMenu, setOpenMenu] = useState<string | null>(null);
@@ -132,33 +160,29 @@ function ProjectManagementContent() {
     []
   );
 
-  // Project type filter (page-specific, on top of shared filters)
-  // Override is tagged with pathname so it auto-expires on navigation
-  const pathname = usePathname();
+  // Project type filter (page-specific, on top of shared filters).
+  // null means "use the user's configured default"; [] means "cleared in this session".
   const { getFilter: getDefaultFilter, isFetched: defaultFiltersFetched } =
     useDefaultFilters(user?.id ?? null);
 
-  const [projectTypeOverride, setProjectTypeOverride] = useState<{
-    values: string[];
-    path: string;
-  } | null>(null);
-
   const setProjectTypeFilter = useCallback(
-    (values: string[]) => setProjectTypeOverride({ values, path: pathname }),
-    [pathname]
+    (values: string[]) => {
+      setStoredCurrentPage(1);
+      setProjectTypeFilterOverride(values);
+    },
+    [setProjectTypeFilterOverride, setStoredCurrentPage]
   );
 
-  // Resolve: use override only if it was set on THIS page visit, otherwise use defaults
   const resolvedProjectTypeFilter: string[] = useMemo(() => {
-    if (projectTypeOverride && projectTypeOverride.path === pathname) {
-      return projectTypeOverride.values;
+    if (projectTypeFilterOverride !== null) {
+      return projectTypeFilterOverride;
     }
     if (defaultFiltersFetched) {
       const pt = getDefaultFilter("project_type");
       return pt?.included_values?.length ? pt.included_values : [];
     }
     return [];
-  }, [projectTypeOverride, pathname, defaultFiltersFetched, getDefaultFilter]);
+  }, [projectTypeFilterOverride, defaultFiltersFetched, getDefaultFilter]);
 
   // Instructions drawer state
   const [instructionsDrawer, setInstructionsDrawer] = useState<{
@@ -196,7 +220,10 @@ function ProjectManagementContent() {
     hasActiveFilters: baseHasActiveFilters,
     clearFilters: baseClearFilters,
     applyBaseFilters,
-  } = useProjectFilters(allProjects);
+  } = useProjectFilters(allProjects, {
+    filters: storedFilters,
+    onFiltersChange: setStoredFilters,
+  });
 
   // Determine project status based on translators
   const getProjectStatus = useCallback((
@@ -291,7 +318,58 @@ function ProjectManagementContent() {
     itemsPerPage,
     paginatedItems: paginatedProjects,
     setCurrentPage,
-  } = useProjectListPagination(filteredProjects);
+  } = useProjectListPagination(filteredProjects, {
+    currentPage: storedCurrentPage,
+    onPageChange: setStoredCurrentPage,
+  });
+
+  useEffect(() => {
+    if (projectsLoading) return;
+    if (
+      !shouldScrollToTop &&
+      returnProjectId == null &&
+      (hasRestoredSessionScroll.current || storedScrollY <= 0)
+    ) {
+      return;
+    }
+
+    let cleanupRestore: (() => void) | undefined;
+    const timeout = window.setTimeout(() => {
+      if (shouldScrollToTop) {
+        cleanupRestore = restoreWindowScrollY(0);
+        clearScrollToTop();
+        hasRestoredSessionScroll.current = true;
+        return;
+      }
+
+      if (returnProjectId == null) {
+        cleanupRestore = restoreWindowScrollY(storedScrollY);
+        hasRestoredSessionScroll.current = true;
+        return;
+      }
+
+      const target = document.querySelector<HTMLElement>(
+        `[data-management-project-id="${returnProjectId}"]`
+      );
+      if (target) cleanupRestore = restoreElementIntoView(target);
+      clearReturnProject();
+      hasRestoredSessionScroll.current = true;
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timeout);
+      cleanupRestore?.();
+    };
+  }, [
+    clearReturnProject,
+    clearScrollToTop,
+    projectsLoading,
+    returnProjectId,
+    shouldScrollToTop,
+    storedScrollY,
+    viewMode,
+    paginatedProjects,
+  ]);
 
   const groupedProjects = useMemo(
     () => groupProjectsByExactName(paginatedProjects),
@@ -658,6 +736,7 @@ function ProjectManagementContent() {
   };
 
   const handleEditDetails = (projectId: number) => {
+    rememberReturnProject(projectId);
     setOpenMenu(null);
     router.push(`/project/${projectId}/edit`);
   };
@@ -675,8 +754,9 @@ function ProjectManagementContent() {
   };
 
   const clearAllFilters = () => {
+    setStoredCurrentPage(1);
     baseClearFilters();
-    setProjectTypeFilter([]);
+    setProjectTypeFilterOverride([]);
   };
 
   const hasActiveFilters = baseHasActiveFilters || resolvedProjectTypeFilter.length > 0;
@@ -769,7 +849,10 @@ function ProjectManagementContent() {
         <div className="space-y-4">
           <SearchBar
             value={searchTerm}
-            onChange={setSearchTerm}
+            onChange={(value) => {
+              setStoredCurrentPage(1);
+              setSearchTerm(value);
+            }}
             placeholder="Search by project name"
           />
 
@@ -780,7 +863,10 @@ function ProjectManagementContent() {
                 label="System"
                 options={uniqueSystems}
                 selected={systemFilter}
-                onSelect={setSystemFilter}
+                onSelect={(value) => {
+                  setStoredCurrentPage(1);
+                  setSystemFilter(value);
+                }}
               />
               <FilterDropdown
                 label="Due Date"
@@ -793,33 +879,51 @@ function ProjectManagementContent() {
                   "Custom date",
                 ]}
                 selected={dueDateFilter}
-                onSelect={setDueDateFilter}
+                onSelect={(value) => {
+                  setStoredCurrentPage(1);
+                  setDueDateFilter(value);
+                }}
                 customDateValue={customDueDate}
-                onCustomDateChange={setCustomDueDate}
+                onCustomDateChange={(value) => {
+                  setStoredCurrentPage(1);
+                  setCustomDueDate(value);
+                }}
               />
               <FilterDropdown
                 label="Assignment Status"
                 options={["Unassigned", "Assigned"]}
                 selected={assignmentStatusFilter}
-                onSelect={setAssignmentStatusFilter}
+                onSelect={(value) => {
+                  setStoredCurrentPage(1);
+                  setAssignmentStatusFilter(value);
+                }}
               />
               <FilterDropdown
                 label="Source Language"
                 options={uniqueSourceLangs}
                 selected={sourceLangFilter}
-                onSelect={setSourceLangFilter}
+                onSelect={(value) => {
+                  setStoredCurrentPage(1);
+                  setSourceLangFilter(value);
+                }}
               />
               <FilterDropdown
                 label="Target Language"
                 options={uniqueTargetLangs}
                 selected={targetLangFilter}
-                onSelect={setTargetLangFilter}
+                onSelect={(value) => {
+                  setStoredCurrentPage(1);
+                  setTargetLangFilter(value);
+                }}
               />
               <FilterDropdown
                 label="Length"
                 options={["Short", "Long"]}
                 selected={lengthFilter}
-                onSelect={setLengthFilter}
+                onSelect={(value) => {
+                  setStoredCurrentPage(1);
+                  setLengthFilter(value);
+                }}
               />
               {uniqueProjectTypes.length > 0 && (
                 <MultiSelectFilterDropdown

@@ -5,6 +5,11 @@ import {
   matchesDueDateFilter,
   matchesLengthFilter,
 } from "@/utils/filterHelpers";
+import {
+  createDefaultProjectFilterState,
+  type ProjectFilterState,
+  type ProjectFilterUpdate,
+} from "@/lib/projectFilterState";
 
 /** Minimal project shape required by the filter logic */
 interface FilterableProject {
@@ -21,17 +26,73 @@ interface FilterableProject {
   translators: { assignment_status: string }[];
 }
 
-export function useProjectFilters<T extends FilterableProject>(projects: T[]) {
-  // Filter state
-  const [searchTerm, setSearchTerm] = useState("");
-  const [systemFilter, setSystemFilter] = useState<string | null>(null);
-  const [dueDateFilter, setDueDateFilter] = useState<string | null>(null);
-  const [customDueDate, setCustomDueDate] = useState<string>("");
-  const [assignmentStatusFilter, setAssignmentStatusFilter] = useState<string | null>(null);
-  const [sourceLangFilter, setSourceLangFilter] = useState<string | null>(null);
-  const [targetLangFilter, setTargetLangFilter] = useState<string | null>(null);
-  const [lengthFilter, setLengthFilter] = useState<string | null>(null);
+interface UseProjectFiltersOptions {
+  filters?: ProjectFilterState;
+  onFiltersChange?: (filters: ProjectFilterUpdate) => void;
+}
+
+export function useProjectFilters<T extends FilterableProject>(
+  projects: T[],
+  options?: UseProjectFiltersOptions
+) {
+  const [uncontrolledFilters, setUncontrolledFilters] =
+    useState<ProjectFilterState>(() => createDefaultProjectFilterState());
+  const filters = options?.filters ?? uncontrolledFilters;
+  const setFilters = options?.onFiltersChange ?? setUncontrolledFilters;
+  const {
+    searchTerm,
+    systemFilter,
+    dueDateFilter,
+    customDueDate,
+    assignmentStatusFilter,
+    sourceLangFilter,
+    targetLangFilter,
+    lengthFilter,
+  } = filters;
   const deferredSearchTerm = useDeferredValue(searchTerm);
+
+  const updateFilter = useCallback(
+    <K extends keyof ProjectFilterState>(
+      key: K,
+      value: ProjectFilterState[K]
+    ) => {
+      setFilters((currentFilters) => ({ ...currentFilters, [key]: value }));
+    },
+    [setFilters]
+  );
+
+  const setSearchTerm = useCallback(
+    (value: string) => updateFilter("searchTerm", value),
+    [updateFilter]
+  );
+  const setSystemFilter = useCallback(
+    (value: string | null) => updateFilter("systemFilter", value),
+    [updateFilter]
+  );
+  const setDueDateFilter = useCallback(
+    (value: string | null) => updateFilter("dueDateFilter", value),
+    [updateFilter]
+  );
+  const setCustomDueDate = useCallback(
+    (value: string) => updateFilter("customDueDate", value),
+    [updateFilter]
+  );
+  const setAssignmentStatusFilter = useCallback(
+    (value: string | null) => updateFilter("assignmentStatusFilter", value),
+    [updateFilter]
+  );
+  const setSourceLangFilter = useCallback(
+    (value: string | null) => updateFilter("sourceLangFilter", value),
+    [updateFilter]
+  );
+  const setTargetLangFilter = useCallback(
+    (value: string | null) => updateFilter("targetLangFilter", value),
+    [updateFilter]
+  );
+  const setLengthFilter = useCallback(
+    (value: string | null) => updateFilter("lengthFilter", value),
+    [updateFilter]
+  );
 
   // Derived unique values for dropdowns
   const uniqueSystems = useMemo(() => {
@@ -64,15 +125,8 @@ export function useProjectFilters<T extends FilterableProject>(projects: T[]) {
   }, [projects]);
 
   const clearFilters = useCallback(() => {
-    setSearchTerm("");
-    setSystemFilter(null);
-    setDueDateFilter(null);
-    setCustomDueDate("");
-    setAssignmentStatusFilter(null);
-    setSourceLangFilter(null);
-    setTargetLangFilter(null);
-    setLengthFilter(null);
-  }, []);
+    setFilters(createDefaultProjectFilterState());
+  }, [setFilters]);
 
   const hasActiveFilters =
     !!deferredSearchTerm ||

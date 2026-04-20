@@ -38,6 +38,7 @@ import { toast } from "sonner";
 import { getUserFriendlyError } from "@/utils/toastHelpers";
 import { queryKeys } from "@/lib/queryKeys";
 import { useLayoutStore } from "@/lib/stores/useLayoutStore";
+import { useManagementPageStore } from "@/lib/stores/useManagementPageStore";
 import type { ProjectWithTranslatorDetails } from "@/types/project";
 
 const projectSchema = z.object({
@@ -137,6 +138,7 @@ export default function EditProjectPage() {
 
   const { data: project, isLoading, error } = useProject(projectId);
   const collapsed = useLayoutStore((state) => state.collapsed);
+  const resetManagementToStart = useManagementPageStore((state) => state.resetToStart);
 
   // State for collaborator management
   const [addTranslatorModal, setAddTranslatorModal] = useState<{
@@ -482,11 +484,15 @@ export default function EditProjectPage() {
         throw new Error(`Failed to update project: ${error.message}`);
       }
     },
-    onSuccess: () => {
+    onSuccess: (_, values) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.project(projectId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.projects() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.projectsWithTranslators() });
+      if (values.status === "complete") {
+        resetManagementToStart();
+      }
       toast.success("Project updated successfully");
-      router.push(`/project/${projectId}`);
+      router.back();
     },
     onError: (error: Error) => {
       toast.error(getUserFriendlyError(error, "project update"));

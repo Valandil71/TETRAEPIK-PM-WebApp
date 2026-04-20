@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { X, Loader2, AlertCircle } from "lucide-react";
 import { useUser } from "@/hooks/user/useUser";
 import { useProjectsWithTranslators } from "@/hooks/project/useProjectsWithTranslators";
@@ -22,15 +22,16 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { getUserFriendlyError } from "@/utils/toastHelpers";
 import { useLayoutStore } from "@/lib/stores/useLayoutStore";
+import { useInvoicingPageStore } from "@/lib/stores/useInvoicingPageStore";
 import {
   getGroupSelectionState,
   groupProjectsByExactName,
 } from "@/lib/projectGrouping";
 import { useProjectGroupExpansion } from "@/hooks/project/useProjectGroupExpansion";
 import { useProjectListPagination } from "@/hooks/project/useProjectListPagination";
+import { useWindowScrollMemory } from "@/hooks/ui/useWindowScrollMemory";
+import { restoreWindowScrollY } from "@/utils/scrollRestoration";
 
-type TabType = "all" | "toBeInvoiced" | "toBePaid";
-type ViewMode = "table" | "card";
 type ConfirmActionType = "invoiced" | "paid" | "paidAndInvoiced" | null;
 
 export default function InvoicingPage() {
@@ -59,16 +60,37 @@ function InvoicingContent() {
   const supabase = createBrowserClient(supabaseUrl, supabaseKey);
 
   // State
-  const [activeTab, setActiveTab] = useState<TabType>("all");
-  const [viewMode, setViewMode] = useState<ViewMode>("table");
-  const [selectedProjects, setSelectedProjects] = useState<Set<number>>(
-    new Set()
+  const {
+    activeTab,
+    setActiveTab,
+    viewMode,
+    setViewMode,
+    currentPage: storedCurrentPage,
+    setCurrentPage: setStoredCurrentPage,
+    hideFullyProcessed,
+    setHideFullyProcessed,
+    selectedProjectIds,
+    setSelectedProjectIds,
+    scrollY: storedScrollY,
+    setScrollY: setStoredScrollY,
+    filters: storedFilters,
+    setFilters: setStoredFilters,
+  } = useInvoicingPageStore();
+  const hasRestoredSessionScroll = useRef(false);
+  useWindowScrollMemory({
+    scrollY: storedScrollY,
+    setScrollY: setStoredScrollY,
+  });
+  const selectedProjects = useMemo(
+    () => new Set(selectedProjectIds),
+    [selectedProjectIds]
+  );
+  const setSelectedProjects = useCallback(
+    (projects: Set<number>) => setSelectedProjectIds(Array.from(projects)),
+    [setSelectedProjectIds]
   );
   const [confirmAction, setConfirmAction] = useState<ConfirmActionType>(null);
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
-
-  // Page-specific filter states
-  const [hideFullyProcessed, setHideFullyProcessed] = useState<boolean>(true);
 
   // Fetch all projects
   const {
@@ -107,7 +129,10 @@ function InvoicingContent() {
     hasActiveFilters: baseHasActiveFilters,
     clearFilters: baseClearFilters,
     applyBaseFilters,
-  } = useProjectFilters(allProjectsRaw);
+  } = useProjectFilters(allProjectsRaw, {
+    filters: storedFilters,
+    onFiltersChange: setStoredFilters,
+  });
 
   // Get closest deadline for a project
   const getClosestDeadline = useCallback((project: (typeof allProjectsRaw)[0]) => {
@@ -216,7 +241,29 @@ function InvoicingContent() {
     itemsPerPage,
     paginatedItems: paginatedProjects,
     setCurrentPage,
-  } = useProjectListPagination(filteredProjects);
+  } = useProjectListPagination(filteredProjects, {
+    currentPage: storedCurrentPage,
+    onPageChange: setStoredCurrentPage,
+  });
+
+  const loading = userLoading || projectsLoading;
+
+  useEffect(() => {
+    if (loading || hasRestoredSessionScroll.current || storedScrollY <= 0) {
+      return;
+    }
+
+    let cleanupRestore: (() => void) | undefined;
+    const timeout = window.setTimeout(() => {
+      cleanupRestore = restoreWindowScrollY(storedScrollY);
+      hasRestoredSessionScroll.current = true;
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timeout);
+      cleanupRestore?.();
+    };
+  }, [loading, storedScrollY]);
 
   const groupedProjects = useMemo(
     () => groupProjectsByExactName(paginatedProjects),
@@ -419,6 +466,7 @@ function InvoicingContent() {
       markPaidAndInvoicedMutation.isPending);
 
   const clearAllFilters = () => {
+    setStoredCurrentPage(1);
     baseClearFilters();
     setHideFullyProcessed(true);
   };
@@ -426,7 +474,7 @@ function InvoicingContent() {
   const hasActiveFilters = baseHasActiveFilters || !hideFullyProcessed;
 
   // Loading state
-  if (userLoading || projectsLoading) {
+  if (loading) {
     return (
       <div className="p-8 max-w-screen-2xl mx-auto">
         <div className="flex items-center justify-center min-h-[400px]">
@@ -481,10 +529,7 @@ function InvoicingContent() {
             <StatusTabs
               tabs={tabs}
               activeTab={activeTab}
-              onTabChange={(tab) => {
-                setActiveTab(tab);
-                setSelectedProjects(new Set());
-              }}
+              onTabChange={setActiveTab}
             />
             <div className="mb-3 flex flex-col items-center gap-1">
               <span className="text-gray-500 dark:text-gray-400 text-xs">
@@ -499,7 +544,10 @@ function InvoicingContent() {
         <div className="space-y-4">
           <SearchBar
             value={searchTerm}
-            onChange={setSearchTerm}
+            onChange={(value) => {
+              setStoredCurrentPage(1);
+              setSearchTerm(value);
+            }}
             placeholder="Search by project name"
           />
 
@@ -510,7 +558,10 @@ function InvoicingContent() {
                 label="System"
                 options={uniqueSystems}
                 selected={systemFilter}
-                onSelect={setSystemFilter}
+                onSelect={(value) => {
+                  setStoredCurrentPage(1);
+                  setSystemFilter(value);
+                }}
               />
               <FilterDropdown
                 label="Due Date"
@@ -523,33 +574,51 @@ function InvoicingContent() {
                   "Custom date",
                 ]}
                 selected={dueDateFilter}
-                onSelect={setDueDateFilter}
+                onSelect={(value) => {
+                  setStoredCurrentPage(1);
+                  setDueDateFilter(value);
+                }}
                 customDateValue={customDueDate}
-                onCustomDateChange={setCustomDueDate}
+                onCustomDateChange={(value) => {
+                  setStoredCurrentPage(1);
+                  setCustomDueDate(value);
+                }}
               />
               <FilterDropdown
                 label="Assignment Status"
                 options={["Unassigned", "Assigned"]}
                 selected={assignmentStatusFilter}
-                onSelect={setAssignmentStatusFilter}
+                onSelect={(value) => {
+                  setStoredCurrentPage(1);
+                  setAssignmentStatusFilter(value);
+                }}
               />
               <FilterDropdown
                 label="Source Language"
                 options={uniqueSourceLangs}
                 selected={sourceLangFilter}
-                onSelect={setSourceLangFilter}
+                onSelect={(value) => {
+                  setStoredCurrentPage(1);
+                  setSourceLangFilter(value);
+                }}
               />
               <FilterDropdown
                 label="Target Language"
                 options={uniqueTargetLangs}
                 selected={targetLangFilter}
-                onSelect={setTargetLangFilter}
+                onSelect={(value) => {
+                  setStoredCurrentPage(1);
+                  setTargetLangFilter(value);
+                }}
               />
               <FilterDropdown
                 label="Length"
                 options={["Short", "Long"]}
                 selected={lengthFilter}
-                onSelect={setLengthFilter}
+                onSelect={(value) => {
+                  setStoredCurrentPage(1);
+                  setLengthFilter(value);
+                }}
               />
               {/* Toggle for showing fully processed projects */}
               <button

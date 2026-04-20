@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/popover";
 import { getInstructionsPreview } from "@/utils/instructionsPreview";
 import { useInstructionExclusions } from "@/hooks/settings/useInstructionExclusions";
+import { useManagementPageStore } from "@/lib/stores/useManagementPageStore";
 import type { ProjectGroup } from "@/lib/projectGrouping";
 import { getGroupDisplayName } from "@/lib/projectGrouping";
 
@@ -157,6 +158,9 @@ export function ManagementTable({
   const router = useRouter();
   const { getSystemColorPreview, getLanguageColorPreview } = useColorSettings();
   const { exclusionSet } = useInstructionExclusions(null);
+  const rememberReturnProject = useManagementPageStore(
+    (state) => state.rememberReturnProject
+  );
 
   const getSystemColorStyleLocal = (system: string) =>
     getSystemColorStyle(system, getSystemColorPreview);
@@ -167,6 +171,7 @@ export function ManagementTable({
     if ((e.target as HTMLElement).closest("button")) {
       return;
     }
+    rememberReturnProject(project.id);
     router.push(`/project/${project.id}`);
   };
 
@@ -268,6 +273,7 @@ export function ManagementTable({
                           isGrouped ? "bg-blue-50/30 dark:bg-blue-900/5 hover:bg-blue-50 dark:hover:bg-blue-900/10"
                           : "hover:bg-blue-50 dark:hover:bg-blue-900/10"
                         }`}
+                        data-management-project-id={project.id}
                         onClick={(e) => handleRowClick(project, e)}
                       >
                         <td className={`px-6 py-4 relative ${isGrouped ? "pl-10" : ""}`}>

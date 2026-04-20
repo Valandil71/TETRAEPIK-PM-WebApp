@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect, useCallback } from "react";
-import { usePathname } from "next/navigation";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { X } from "lucide-react";
 import { SearchBar } from "@/components/general/SearchBar";
 import { FilterDropdown } from "@/components/general/FilterDropdown";
@@ -25,6 +24,7 @@ import { queryKeys } from "@/lib/queryKeys";
 import { toast } from "sonner";
 import { getUserFriendlyError } from "@/utils/toastHelpers";
 import { useLayoutStore } from "@/lib/stores/useLayoutStore";
+import { useAssignProjectsPageStore } from "@/lib/stores/useAssignProjectsPageStore";
 import { useUser } from "@/hooks/user/useUser";
 import { useDefaultFilters } from "@/hooks/settings/useDefaultFilters";
 import {
@@ -33,8 +33,8 @@ import {
 } from "@/lib/projectGrouping";
 import { useProjectGroupExpansion } from "@/hooks/project/useProjectGroupExpansion";
 import { useProjectListPagination } from "@/hooks/project/useProjectListPagination";
-
-const ASSIGN_SELECTION_STORAGE_KEY = "assign-projects:selected-project-ids";
+import { useWindowScrollMemory } from "@/hooks/ui/useWindowScrollMemory";
+import { restoreWindowScrollY } from "@/utils/scrollRestoration";
 
 const isTypingTarget = (target: EventTarget | null) => {
   if (!(target instanceof HTMLElement)) return false;
@@ -61,60 +61,60 @@ function AssignProjectsContent() {
   const { user } = useUser();
   const collapsed = useLayoutStore((state) => state.collapsed);
   const groupExpansionMode = useLayoutStore((state) => state.groupExpansionMode);
-
-  const [selectedProjects, setSelectedProjects] = useState<Set<number>>(() => {
-    if (typeof window === "undefined") return new Set();
-
-    try {
-      const rawStoredSelection = window.localStorage.getItem(
-        ASSIGN_SELECTION_STORAGE_KEY
-      );
-      if (!rawStoredSelection) return new Set();
-
-      const parsedSelection = JSON.parse(rawStoredSelection);
-      if (!Array.isArray(parsedSelection)) return new Set();
-
-      const validSelection = parsedSelection
-        .map((id) => Number(id))
-        .filter((id) => Number.isFinite(id));
-      return new Set(validSelection);
-    } catch {
-      window.localStorage.removeItem(ASSIGN_SELECTION_STORAGE_KEY);
-      return new Set();
-    }
+  const {
+    viewMode,
+    setViewMode,
+    currentPage: storedCurrentPage,
+    setCurrentPage: setStoredCurrentPage,
+    selectedProjectIds,
+    setSelectedProjectIds,
+    scrollY: storedScrollY,
+    setScrollY: setStoredScrollY,
+    filters: storedFilters,
+    setFilters: setStoredFilters,
+    assignmentFilter,
+    setAssignmentFilter,
+    projectTypeFilterOverride,
+    setProjectTypeFilterOverride,
+  } = useAssignProjectsPageStore();
+  const hasRestoredSessionScroll = useRef(false);
+  useWindowScrollMemory({
+    scrollY: storedScrollY,
+    setScrollY: setStoredScrollY,
   });
-  const [showUserSelection, setShowUserSelection] = useState(false);
-  const [viewMode, setViewMode] = useState<"table" | "card">("table");
-
-  // Page-specific filter states
-  const [assignmentFilter, setAssignmentFilter] = useState<string | null>(
-    "Unassigned"
+  const selectedProjects = useMemo(
+    () => new Set(selectedProjectIds),
+    [selectedProjectIds]
   );
-  // Project type filter — override is tagged with pathname so it auto-expires on navigation
-  const pathname = usePathname();
+  const setSelectedProjects = useCallback(
+    (projects: Set<number>) => setSelectedProjectIds(Array.from(projects)),
+    [setSelectedProjectIds]
+  );
+  const [showUserSelection, setShowUserSelection] = useState(false);
+
+  // Project type filter: null means "use the user's configured default";
+  // [] means "cleared in this page for the current session".
   const { getFilter: getDefaultFilter, isFetched: defaultFiltersFetched } =
     useDefaultFilters(user?.id ?? null);
 
-  const [projectTypeOverride, setProjectTypeOverride] = useState<{
-    values: string[];
-    path: string;
-  } | null>(null);
-
   const setProjectTypeFilter = useCallback(
-    (values: string[]) => setProjectTypeOverride({ values, path: pathname }),
-    [pathname]
+    (values: string[]) => {
+      setStoredCurrentPage(1);
+      setProjectTypeFilterOverride(values);
+    },
+    [setProjectTypeFilterOverride, setStoredCurrentPage]
   );
 
   const resolvedProjectTypeFilter: string[] = useMemo(() => {
-    if (projectTypeOverride && projectTypeOverride.path === pathname) {
-      return projectTypeOverride.values;
+    if (projectTypeFilterOverride !== null) {
+      return projectTypeFilterOverride;
     }
     if (defaultFiltersFetched) {
       const pt = getDefaultFilter("project_type");
       return pt?.included_values?.length ? pt.included_values : [];
     }
     return [];
-  }, [projectTypeOverride, pathname, defaultFiltersFetched, getDefaultFilter]);
+  }, [projectTypeFilterOverride, defaultFiltersFetched, getDefaultFilter]);
 
   // Shared filter state + logic
   const {
@@ -132,7 +132,10 @@ function AssignProjectsContent() {
     hasActiveFilters: baseHasActiveFilters,
     clearFilters: baseClearFilters,
     applyBaseFilters,
-  } = useProjectFilters(allProjects);
+  } = useProjectFilters(allProjects, {
+    filters: storedFilters,
+    onFiltersChange: setStoredFilters,
+  });
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey =
@@ -146,24 +149,29 @@ function AssignProjectsContent() {
   const supabase = createBrowserClient(supabaseUrl, supabaseKey);
 
   const loading = projectsLoading;
-  useEffect(() => {
-    if (typeof window === "undefined") return;
 
-    const selectionArray = Array.from(selectedProjects);
-    if (selectionArray.length === 0) {
-      window.localStorage.removeItem(ASSIGN_SELECTION_STORAGE_KEY);
+  useEffect(() => {
+    if (loading || showUserSelection || hasRestoredSessionScroll.current || storedScrollY <= 0) {
       return;
     }
 
-    window.localStorage.setItem(
-      ASSIGN_SELECTION_STORAGE_KEY,
-      JSON.stringify(selectionArray)
-    );
-  }, [selectedProjects]);
+    let cleanupRestore: (() => void) | undefined;
+    const timeout = window.setTimeout(() => {
+      cleanupRestore = restoreWindowScrollY(storedScrollY);
+      hasRestoredSessionScroll.current = true;
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timeout);
+      cleanupRestore?.();
+    };
+  }, [loading, showUserSelection, storedScrollY]);
+
   const clearAllFilters = () => {
+    setStoredCurrentPage(1);
     baseClearFilters();
     setAssignmentFilter(null);
-    setProjectTypeFilter([]);
+    setProjectTypeFilterOverride([]);
   };
 
   const hasActiveFilters = baseHasActiveFilters || !!assignmentFilter || resolvedProjectTypeFilter.length > 0;
@@ -197,7 +205,10 @@ function AssignProjectsContent() {
     itemsPerPage,
     paginatedItems: paginatedProjects,
     setCurrentPage,
-  } = useProjectListPagination(filteredProjects);
+  } = useProjectListPagination(filteredProjects, {
+    currentPage: storedCurrentPage,
+    onPageChange: setStoredCurrentPage,
+  });
 
   const groupedProjects = useMemo(
     () => groupProjectsByExactName(paginatedProjects),
@@ -247,7 +258,7 @@ function AssignProjectsContent() {
 
   const handleClearSelection = useCallback(() => {
     setSelectedProjects(new Set());
-  }, []);
+  }, [setSelectedProjects]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -381,7 +392,10 @@ function AssignProjectsContent() {
         <div className="flex flex-wrap gap-4 items-end">
           <SearchBar
             value={searchTerm}
-            onChange={setSearchTerm}
+            onChange={(value) => {
+              setStoredCurrentPage(1);
+              setSearchTerm(value);
+            }}
             placeholder="Search by project name"
           />
 
@@ -400,13 +414,19 @@ function AssignProjectsContent() {
               label="Assignment Status"
               options={["Unassigned", "Assigned"]}
               selected={assignmentFilter}
-              onSelect={setAssignmentFilter}
+              onSelect={(value) => {
+                setStoredCurrentPage(1);
+                setAssignmentFilter(value);
+              }}
             />
             <FilterDropdown
               label="System"
               options={uniqueSystems}
               selected={systemFilter}
-              onSelect={setSystemFilter}
+              onSelect={(value) => {
+                setStoredCurrentPage(1);
+                setSystemFilter(value);
+              }}
             />
             <FilterDropdown
               label="Due Date"
@@ -419,27 +439,42 @@ function AssignProjectsContent() {
                 "Custom date",
               ]}
               selected={dueDateFilter}
-              onSelect={setDueDateFilter}
+              onSelect={(value) => {
+                setStoredCurrentPage(1);
+                setDueDateFilter(value);
+              }}
               customDateValue={customDueDate}
-              onCustomDateChange={setCustomDueDate}
+              onCustomDateChange={(value) => {
+                setStoredCurrentPage(1);
+                setCustomDueDate(value);
+              }}
             />
             <FilterDropdown
               label="Source Language"
               options={uniqueSourceLangs}
               selected={sourceLangFilter}
-              onSelect={setSourceLangFilter}
+              onSelect={(value) => {
+                setStoredCurrentPage(1);
+                setSourceLangFilter(value);
+              }}
             />
             <FilterDropdown
               label="Target Language"
               options={uniqueTargetLangs}
               selected={targetLangFilter}
-              onSelect={setTargetLangFilter}
+              onSelect={(value) => {
+                setStoredCurrentPage(1);
+                setTargetLangFilter(value);
+              }}
             />
             <FilterDropdown
               label="Length"
               options={["Short", "Long"]}
               selected={lengthFilter}
-              onSelect={setLengthFilter}
+              onSelect={(value) => {
+                setStoredCurrentPage(1);
+                setLengthFilter(value);
+              }}
             />
             {uniqueProjectTypes.length > 0 && (
               <MultiSelectFilterDropdown

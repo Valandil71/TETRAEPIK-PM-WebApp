@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/popover";
 import { getInstructionsPreview } from "@/utils/instructionsPreview";
 import { useInstructionExclusions } from "@/hooks/settings/useInstructionExclusions";
+import { useManagementPageStore } from "@/lib/stores/useManagementPageStore";
 import type { ProjectGroup } from "@/lib/projectGrouping";
 import { getGroupDisplayName } from "@/lib/projectGrouping";
 
@@ -158,6 +159,9 @@ export function ManagementCard({
   const router = useRouter();
   const { getSystemColorPreview, getLanguageColorPreview } = useColorSettings();
   const { exclusionSet } = useInstructionExclusions(null);
+  const rememberReturnProject = useManagementPageStore(
+    (state) => state.rememberReturnProject
+  );
 
   const getSystemColorStyleLocal = (system: string) =>
     getSystemColorStyle(system, getSystemColorPreview);
@@ -168,6 +172,7 @@ export function ManagementCard({
     if ((e.target as HTMLElement).closest("button")) {
       return;
     }
+    rememberReturnProject(id);
     router.push(`/project/${id}`);
   };
 
@@ -207,6 +212,7 @@ export function ManagementCard({
     <div
       key={project.id}
       className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-4 cursor-pointer hover:shadow-lg dark:hover:shadow-blue-500/20 dark:hover:border-blue-500/50 transition-all"
+      data-management-project-id={project.id}
       onClick={(e) => handleCardClick(project.id, e)}
     >
       <div className="flex items-center justify-between">
@@ -449,7 +455,6 @@ export function ManagementCard({
     </TooltipProvider>
   );
 }
-
 
 
 

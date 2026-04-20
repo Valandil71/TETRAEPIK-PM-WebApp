@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Check, X } from "lucide-react";
+import { Check, Info, X } from "lucide-react";
 import { formatNumber, formatProjectName } from "@/utils/formatters";
 import { useColorSettings } from "@/hooks/settings/useColorSettings";
 import { getSystemColorStyle, getLanguageColorStyle } from "@/utils/projectTableHelpers";
@@ -147,6 +147,23 @@ export function MyProjectsTable({
         assignment.projects.instructions || "-"
       ),
     },
+    ...(activeTab === "inProgress" ?
+      [
+        {
+          header: "Info from PM",
+          className: "max-w-xs",
+          render: (assignment: ProjectAssignment) =>
+            assignment.initial_message ?
+              <div className="flex gap-2 text-sm text-gray-700 dark:text-gray-300">
+                <Info className="w-4 h-4 text-blue-500 dark:text-blue-400 shrink-0 mt-0.5" />
+                <span className="whitespace-pre-wrap break-words line-clamp-3">
+                  {assignment.initial_message}
+                </span>
+              </div>
+            : <span className="text-gray-400 dark:text-gray-500">-</span>,
+        },
+      ]
+    : []),
     {
       header: "Action",
       render: (assignment: ProjectAssignment) => {
