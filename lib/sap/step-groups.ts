@@ -26,15 +26,25 @@ import { isBlockedSapProjectType } from './project-type-rules';
 import { SAP_DEADLINE_OFFSET_HOURS } from './constants';
 import { appendDeadlineVariantToImportKey } from './import-keys';
 
+const MILLISECONDS_PER_HOUR = 60 * 60 * 1000;
+const ISO_TIMEZONE_SUFFIX_REGEX = /(Z|[+-]\d{2}:\d{2})$/i;
+
 function applyDeadlineOffset(isoDate: string | null | undefined): string | null {
   if (!isoDate) return null;
 
-  const timestamp = Date.parse(isoDate);
+  const trimmedIsoDate = isoDate.trim();
+  if (!trimmedIsoDate) return null;
+
+  const normalizedIsoDate =
+    ISO_TIMEZONE_SUFFIX_REGEX.test(trimmedIsoDate) ?
+      trimmedIsoDate
+    : `${trimmedIsoDate}Z`;
+  const timestamp = Date.parse(normalizedIsoDate);
   if (Number.isNaN(timestamp)) return null;
 
-  const shifted = new Date(timestamp);
-  shifted.setUTCHours(shifted.getUTCHours() + SAP_DEADLINE_OFFSET_HOURS);
-  return shifted.toISOString();
+  return new Date(
+    timestamp + SAP_DEADLINE_OFFSET_HOURS * MILLISECONDS_PER_HOUR
+  ).toISOString();
 }
 
 function isEarlierIsoDate(candidate: string, current: string | null): boolean {

@@ -22,3 +22,6 @@ npm-debug.log*
 # .env
 .env.local
 .env*.local
+
+#.md plans 
+PostgREST_Egress_Plan.md

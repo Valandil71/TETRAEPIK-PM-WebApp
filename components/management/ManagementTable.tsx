@@ -480,7 +480,6 @@ export function ManagementTable({
                             <ProjectActionsMenu
                               projectId={project.id}
                               isOpen={openMenu === String(project.id)}
-                              translators={project.translators}
                               onToggle={() =>
                                 onMenuToggle(
                                   openMenu === String(project.id) ?

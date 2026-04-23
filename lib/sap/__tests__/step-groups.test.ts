@@ -110,6 +110,49 @@ describe('mapSapSubProjectToProjects', () => {
     expect(projects.every((project) => !project.instructions?.includes('Terms:'))).toBe(true);
   });
 
+  it('subtracts exactly 3 hours from API deadlines even when timezone suffix is missing', () => {
+    const details: SapSubProjectInfo = {
+      subProjectId: '7777-10',
+      subProjectName: 'NoTimezone_Deadline_Check',
+      terminologyKey: [],
+      environment: [
+        {
+          contentId: '000001',
+          environmentName: 'SAP Translation System - B0X / 000 / SAP',
+          toolType: 'SAP',
+          toolTypeDescription: 'SAP Translation System',
+          projectUrl: '',
+          graphId: [],
+          lxeProject: [],
+          translationArea: [],
+          worklist: [],
+          is_xtm: false,
+          content_name: 'NoTimezone_Deadline_Check',
+          external_project_id: '0000000000',
+          external_system: '',
+        },
+      ],
+      subProjectSteps: [
+        buildStep({
+          contentId: '000001',
+          slsLang: 'ptBR',
+          endDate: '2026-06-10T17:00:00.000',
+          volumes: [{ volumeUnit: 'Words', volumeQuantity: 10 }],
+        }),
+      ],
+    };
+
+    const projects = mapSapSubProjectToProjects(
+      buildSubProject('7777-10', 'NoTimezone_Deadline_Check'),
+      buildParent(7777, 'Timezone Test'),
+      details,
+      []
+    );
+
+    expect(projects).toHaveLength(1);
+    expect(projects[0].final_deadline).toBe('2026-06-10T14:00:00.000Z');
+  });
+
   it('merges multiple contentIds into a single project when language pair matches', () => {
     const details: SapSubProjectInfo = {
       subProjectId: '4852-33',

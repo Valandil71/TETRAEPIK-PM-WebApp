@@ -21,12 +21,6 @@ import {
 interface ProjectActionsMenuProps {
   projectId: number;
   isOpen: boolean;
-  translators: Array<{
-    id: string;
-    name: string;
-    role: string;
-    assignment_status: string;
-  }>;
   onToggle: () => void;
   onAddTranslator: () => void;
   onRemoveTranslator: () => void;
@@ -39,7 +33,6 @@ interface ProjectActionsMenuProps {
 export function ProjectActionsMenu({
   projectId,
   isOpen,
-  translators,
   onToggle,
   onAddTranslator,
   onRemoveTranslator,
@@ -48,11 +41,6 @@ export function ProjectActionsMenu({
   onEditDetails,
   onCompleteProject,
 }: ProjectActionsMenuProps) {
-  // Check if project is ready to be completed (all translators have assignment_status === "done")
-  const isReadyToComplete =
-    translators.length > 0 &&
-    translators.every((t) => t.assignment_status === "done");
-
   const handleOpenChange = (open: boolean) => {
     // Only call onToggle when closing (to sync parent state)
     // or when opening from closed state
@@ -80,21 +68,17 @@ export function ProjectActionsMenu({
         className="w-52 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700"
         onClick={(e) => e.stopPropagation()}
       >
-        {isReadyToComplete && (
-          <>
-            <DropdownMenuItem
-              className="cursor-pointer px-4 py-2.5 text-green-700 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 focus:bg-green-50 dark:focus:bg-green-900/20 focus:text-green-700 dark:focus:text-green-400"
-              onClick={(e) => {
-                e.stopPropagation();
-                onCompleteProject();
-              }}
-            >
-              <CheckCircle className="w-4 h-4 mr-2" />
-              Complete Project
-            </DropdownMenuItem>
-            <DropdownMenuSeparator className="bg-gray-200 dark:bg-gray-700" />
-          </>
-        )}
+        <DropdownMenuItem
+          className="cursor-pointer px-4 py-2.5 text-green-700 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 focus:bg-green-50 dark:focus:bg-green-900/20 focus:text-green-700 dark:focus:text-green-400"
+          onClick={(e) => {
+            e.stopPropagation();
+            onCompleteProject();
+          }}
+        >
+          <CheckCircle className="w-4 h-4 mr-2" />
+          Complete Project
+        </DropdownMenuItem>
+        <DropdownMenuSeparator className="bg-gray-200 dark:bg-gray-700" />
         <DropdownMenuItem
           className="cursor-pointer px-4 py-2.5 text-gray-700 dark:text-gray-300 hover:bg-blue-100 dark:hover:bg-gray-700 focus:bg-blue-100 dark:focus:bg-gray-700"
           onClick={(e) => {
