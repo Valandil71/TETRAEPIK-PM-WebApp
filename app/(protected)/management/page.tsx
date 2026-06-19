@@ -38,7 +38,7 @@ import { useProjectFilters } from "@/hooks/project/useProjectFilters";
 import { useManagementPageStore } from "@/lib/stores/useManagementPageStore";
 import { useLayoutStore } from "@/lib/stores/useLayoutStore";
 import type { SapInstructionEntry } from "@/types/project";
-import { groupProjectsByExactName } from "@/lib/projectGrouping";
+import { groupProjectsForDisplay } from "@/lib/projectGrouping";
 import { useProjectGroupExpansion } from "@/hooks/project/useProjectGroupExpansion";
 import { useProjectListPagination } from "@/hooks/project/useProjectListPagination";
 import { useWindowScrollMemory } from "@/hooks/ui/useWindowScrollMemory";
@@ -311,14 +311,19 @@ function ProjectManagementContent() {
     return projects;
   }, [allProjects, activeTab, categorizedProjects, applyBaseFilters, resolvedProjectTypeFilter]);
 
+  const groupedProjects = useMemo(
+    () => groupProjectsForDisplay(filteredProjects),
+    [filteredProjects]
+  );
+
   const {
     currentPage,
     totalPages,
     totalItems,
     itemsPerPage,
-    paginatedItems: paginatedProjects,
+    paginatedItems: paginatedProjectGroups,
     setCurrentPage,
-  } = useProjectListPagination(filteredProjects, {
+  } = useProjectListPagination(groupedProjects, {
     currentPage: storedCurrentPage,
     onPageChange: setStoredCurrentPage,
   });
@@ -368,19 +373,14 @@ function ProjectManagementContent() {
     shouldScrollToTop,
     storedScrollY,
     viewMode,
-    paginatedProjects,
+    paginatedProjectGroups,
   ]);
-
-  const groupedProjects = useMemo(
-    () => groupProjectsByExactName(paginatedProjects),
-    [paginatedProjects]
-  );
 
   const groupExpansionMode = useLayoutStore((state) => state.groupExpansionMode);
 
   const { expandedGroups, toggleGroup } =
     useProjectGroupExpansion({
-      groups: groupedProjects,
+      groups: paginatedProjectGroups,
       defaultExpanded: groupExpansionMode === "expandAll",
     });
 
@@ -954,7 +954,7 @@ function ProjectManagementContent() {
       {/* Table or Card View */}
       {viewMode === "table" ?
         <ManagementTable
-          groups={groupedProjects}
+          groups={paginatedProjectGroups}
           expandedGroups={expandedGroups}
           onToggleGroup={toggleGroup}
           openMenu={openMenu}
@@ -981,7 +981,7 @@ function ProjectManagementContent() {
           }
         />
       : <ManagementCard
-          groups={groupedProjects}
+          groups={paginatedProjectGroups}
           expandedGroups={expandedGroups}
           onToggleGroup={toggleGroup}
           openMenu={openMenu}

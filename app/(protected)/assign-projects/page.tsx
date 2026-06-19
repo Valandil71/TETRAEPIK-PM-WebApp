@@ -29,7 +29,7 @@ import { useUser } from "@/hooks/user/useUser";
 import { useDefaultFilters } from "@/hooks/settings/useDefaultFilters";
 import {
   getGroupSelectionState,
-  groupProjectsByExactName,
+  groupProjectsForDisplay,
 } from "@/lib/projectGrouping";
 import { useProjectGroupExpansion } from "@/hooks/project/useProjectGroupExpansion";
 import { useProjectListPagination } from "@/hooks/project/useProjectListPagination";
@@ -198,26 +198,26 @@ function AssignProjectsContent() {
     return projects;
   }, [allProjects, applyBaseFilters, assignmentFilter, resolvedProjectTypeFilter]);
 
+  const groupedProjects = useMemo(
+    () => groupProjectsForDisplay(filteredProjects),
+    [filteredProjects]
+  );
+
   const {
     currentPage,
     totalPages,
     totalItems,
     itemsPerPage,
-    paginatedItems: paginatedProjects,
+    paginatedItems: paginatedProjectGroups,
     setCurrentPage,
-  } = useProjectListPagination(filteredProjects, {
+  } = useProjectListPagination(groupedProjects, {
     currentPage: storedCurrentPage,
     onPageChange: setStoredCurrentPage,
   });
 
-  const groupedProjects = useMemo(
-    () => groupProjectsByExactName(paginatedProjects),
-    [paginatedProjects]
-  );
-
   const { expandedGroups, toggleGroup, expandGroup } =
     useProjectGroupExpansion({
-      groups: groupedProjects,
+      groups: paginatedProjectGroups,
       defaultExpanded: groupExpansionMode === "expandAll",
     });
 
@@ -232,7 +232,7 @@ function AssignProjectsContent() {
   };
 
   const handleGroupSelection = (groupKey: string) => {
-    const group = groupedProjects.find((g) => g.key === groupKey);
+    const group = paginatedProjectGroups.find((g) => g.key === groupKey);
     if (!group) return;
 
     const groupProjectIds = group.projects.map((project) => project.id);
@@ -504,7 +504,7 @@ function AssignProjectsContent() {
       {/* Table or Card View */}
       {viewMode === "table" ?
         <ProjectAssignTable
-          groups={groupedProjects}
+          groups={paginatedProjectGroups}
           expandedGroups={expandedGroups}
           onToggleGroup={toggleGroup}
           selectedProjects={selectedProjects}
@@ -513,7 +513,7 @@ function AssignProjectsContent() {
           onRowClick={handleSelection}
         />
       : <ProjectAssignCard
-          groups={groupedProjects}
+          groups={paginatedProjectGroups}
           expandedGroups={expandedGroups}
           onToggleGroup={toggleGroup}
           selectedProjects={selectedProjects}

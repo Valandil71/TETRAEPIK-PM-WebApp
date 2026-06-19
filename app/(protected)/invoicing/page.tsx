@@ -25,7 +25,8 @@ import { useLayoutStore } from "@/lib/stores/useLayoutStore";
 import { useInvoicingPageStore } from "@/lib/stores/useInvoicingPageStore";
 import {
   getGroupSelectionState,
-  groupProjectsByExactName,
+  compareProjectsByClosestDeadline,
+  groupProjectsForDisplay,
 } from "@/lib/projectGrouping";
 import { useProjectGroupExpansion } from "@/hooks/project/useProjectGroupExpansion";
 import { useProjectListPagination } from "@/hooks/project/useProjectListPagination";
@@ -134,24 +135,6 @@ function InvoicingContent() {
     onFiltersChange: setStoredFilters,
   });
 
-  // Get closest deadline for a project
-  const getClosestDeadline = useCallback((project: (typeof allProjectsRaw)[0]) => {
-    const deadlines = [
-      project.final_deadline,
-      project.interim_deadline,
-      project.initial_deadline,
-    ]
-      .filter(Boolean)
-      .map((d) => {
-        const date = new Date(d!);
-        return isNaN(date.getTime()) ? null : date;
-      })
-      .filter(Boolean) as Date[];
-
-    if (deadlines.length === 0) return null;
-    return new Date(Math.min(...deadlines.map((d) => d.getTime())));
-  }, []);
-
   // Categorize projects by invoicing status
   const categorizedProjects = useMemo(() => {
     const toBeInvoiced: typeof allProjectsRaw = [];
@@ -219,29 +202,28 @@ function InvoicingContent() {
       if (!aFullyProcessed && bFullyProcessed) return -1;
 
       // Within the same group, sort by due date (earliest first)
-      const dateA = getClosestDeadline(a);
-      const dateB = getClosestDeadline(b);
-      if (!dateA && !dateB) return 0;
-      if (!dateA) return 1;
-      if (!dateB) return -1;
-      return dateA.getTime() - dateB.getTime();
+      return compareProjectsByClosestDeadline(a, b);
     });
   }, [
     allProjectsRaw,
     activeTab,
     hideFullyProcessed,
     applyBaseFilters,
-    getClosestDeadline,
   ]);
+
+  const groupedProjects = useMemo(
+    () => groupProjectsForDisplay(filteredProjects),
+    [filteredProjects]
+  );
 
   const {
     currentPage,
     totalPages,
     totalItems,
     itemsPerPage,
-    paginatedItems: paginatedProjects,
+    paginatedItems: paginatedProjectGroups,
     setCurrentPage,
-  } = useProjectListPagination(filteredProjects, {
+  } = useProjectListPagination(groupedProjects, {
     currentPage: storedCurrentPage,
     onPageChange: setStoredCurrentPage,
   });
@@ -265,11 +247,6 @@ function InvoicingContent() {
     };
   }, [loading, storedScrollY]);
 
-  const groupedProjects = useMemo(
-    () => groupProjectsByExactName(paginatedProjects),
-    [paginatedProjects]
-  );
-
   const selectedProjectRecords = useMemo(
     () => allProjectsRaw.filter((project) => selectedProjects.has(project.id)),
     [allProjectsRaw, selectedProjects]
@@ -292,7 +269,7 @@ function InvoicingContent() {
 
   const { expandedGroups, toggleGroup, expandGroup } =
     useProjectGroupExpansion({
-      groups: groupedProjects,
+      groups: paginatedProjectGroups,
       defaultExpanded: groupExpansionMode === "expandAll",
     });
 
@@ -390,7 +367,7 @@ function InvoicingContent() {
   };
 
   const handleGroupSelection = (groupKey: string) => {
-    const group = groupedProjects.find((g) => g.key === groupKey);
+    const group = paginatedProjectGroups.find((g) => g.key === groupKey);
     if (!group) return;
 
     const groupProjectIds = group.projects.map((project) => project.id);
@@ -677,7 +654,7 @@ function InvoicingContent() {
       {/* Table or Card View */}
       {viewMode === "table" ?
         <InvoicingTable
-          groups={groupedProjects}
+          groups={paginatedProjectGroups}
           expandedGroups={expandedGroups}
           onToggleGroup={toggleGroup}
           selectedProjects={selectedProjects}
@@ -686,7 +663,7 @@ function InvoicingContent() {
           onGroupSelection={handleGroupSelection}
         />
       : <InvoicingCard
-          groups={groupedProjects}
+          groups={paginatedProjectGroups}
           expandedGroups={expandedGroups}
           onToggleGroup={toggleGroup}
           selectedProjects={selectedProjects}

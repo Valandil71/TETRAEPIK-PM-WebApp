@@ -31,6 +31,19 @@ const projects = [
     project_type: "Review",
     translators: [{ assignment_status: "claimed" }],
   },
+  {
+    name: "Gamma Project",
+    system: "SAP",
+    language_in: "EN",
+    language_out: "DE",
+    words: 250,
+    lines: 25,
+    initial_deadline: "2026-04-19",
+    interim_deadline: null,
+    final_deadline: null,
+    project_type: "Translation",
+    translators: [],
+  },
 ];
 
 function useControlledProjectFilters() {
@@ -63,5 +76,28 @@ describe("useProjectFilters", () => {
 
     expect(result.current.customDueDate).toBe("2026-04-20");
     expect(result.current.dueDateFilter).toBe("Custom date");
+  });
+
+  it("sorts by the closest available deadline instead of final deadline only", () => {
+    const { result } = renderHook(() => useControlledProjectFilters());
+
+    expect(result.current.applyBaseFilters(projects).map((project) => project.name)).toEqual([
+      "Gamma Project",
+      "Alpha Project",
+      "Beta Project",
+    ]);
+  });
+
+  it("applies due-date filters using the closest available deadline", () => {
+    const { result } = renderHook(() => useControlledProjectFilters());
+
+    act(() => {
+      result.current.setCustomDueDate("2026-04-19");
+      result.current.setDueDateFilter("Custom date");
+    });
+
+    expect(result.current.applyBaseFilters(projects).map((project) => project.name)).toEqual([
+      "Gamma Project",
+    ]);
   });
 });
