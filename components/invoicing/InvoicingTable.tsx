@@ -26,6 +26,8 @@ interface InvoicingTableProps {
   onRowClick: (id: number, e: React.MouseEvent) => void;
   onSelection: (projectId: number) => void;
   onGroupSelection: (groupKey: string) => void;
+  /** Pixel offset for the sticky header so it pins below the page filter bar. */
+  headerOffset?: number;
 }
 
 export function InvoicingTable({
@@ -36,6 +38,7 @@ export function InvoicingTable({
   onRowClick,
   onSelection,
   onGroupSelection,
+  headerOffset = 0,
 }: InvoicingTableProps) {
   const { getSystemColorPreview } = useColorSettings();
   const { exclusionSet } = useInstructionExclusions(null);
@@ -54,20 +57,25 @@ export function InvoicingTable({
   }
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden mb-6">
-      <div className="overflow-x-auto">
+    // overflow-x-clip keeps rounded corners without becoming a scroll container
+    // that would clip the sticky <thead> on the vertical axis.
+    <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-x-clip mb-6">
+      <div>
         <table className="w-full text-sm">
-          <thead>
+          {/* Sticky column header: pins below the page filter bar (z-40) while
+              scrolling rows. z-20 keeps it under the filter bar; opaque cell
+              backgrounds prevent rows showing through. */}
+          <thead className="sticky z-20" style={{ top: headerOffset }}>
             <tr className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
-              <th className="px-6 py-4 w-4" />
-              <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300 w-12" />
-              <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300">System</th>
-              <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300">Project Name</th>
-              <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300 text-center">Invoiced</th>
-              <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300 text-center">Paid</th>
-              <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300">Collaborator(s)</th>
-              <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300">Due Date</th>
-              <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300">Instructions</th>
+              <th className="px-6 py-4 w-4 bg-gray-50 dark:bg-gray-900" />
+              <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300 w-12 bg-gray-50 dark:bg-gray-900" />
+              <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900">System</th>
+              <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900">Project Name</th>
+              <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300 text-center bg-gray-50 dark:bg-gray-900">Invoiced</th>
+              <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300 text-center bg-gray-50 dark:bg-gray-900">Paid</th>
+              <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900">Collaborator(s)</th>
+              <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900">Due Date</th>
+              <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900">Instructions</th>
             </tr>
           </thead>
           <tbody>

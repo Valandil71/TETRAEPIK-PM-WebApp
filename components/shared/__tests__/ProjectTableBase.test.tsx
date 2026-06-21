@@ -39,10 +39,26 @@ describe("ProjectTableBase sticky header", () => {
 
   it("applies sticky positioning to the header when stickyHeader is set", () => {
     const { container } = renderTable(rows, true);
-    const thead = container.querySelector("thead");
-    expect(thead?.className).toContain("sticky");
-    expect(thead?.className).toContain("top-0");
-    expect(thead?.className).toContain("z-20");
+    const thead = container.querySelector("thead") as HTMLElement;
+    expect(thead.className).toContain("sticky");
+    expect(thead.className).toContain("z-20");
+    // top is an inline style (the header offset), defaulting to 0px.
+    expect(thead.style.top).toBe("0px");
+  });
+
+  it("offsets the sticky header by headerOffset (e.g. a page filter bar)", () => {
+    const { container } = render(
+      <ProjectTableBase
+        items={rows}
+        columns={columns}
+        emptyStateTitle="No projects"
+        getRowKey={(r) => r.id}
+        stickyHeader
+        headerOffset={120}
+      />,
+    );
+    const thead = container.querySelector("thead") as HTMLElement;
+    expect(thead.style.top).toBe("120px");
   });
 
   it("does not wrap the table in an overflow container that breaks sticky", () => {

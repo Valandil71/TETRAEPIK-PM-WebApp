@@ -31,6 +31,7 @@ import {
 import { useProjectGroupExpansion } from "@/hooks/project/useProjectGroupExpansion";
 import { useProjectListPagination } from "@/hooks/project/useProjectListPagination";
 import { useWindowScrollMemory } from "@/hooks/ui/useWindowScrollMemory";
+import { useStickyHeaderOffset } from "@/hooks/ui/useStickyHeaderOffset";
 import { restoreWindowScrollY } from "@/utils/scrollRestoration";
 
 type ConfirmActionType = "invoiced" | "paid" | "paidAndInvoiced" | null;
@@ -48,6 +49,9 @@ function InvoicingContent() {
   const queryClient = useQueryClient();
   const collapsed = useLayoutStore((state) => state.collapsed);
   const groupExpansionMode = useLayoutStore((state) => state.groupExpansionMode);
+
+  // Measure the sticky filter bar so the sticky table header can pin below it.
+  const { ref: filtersRef, offset: headerOffset } = useStickyHeaderOffset();
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey =
@@ -499,7 +503,10 @@ function InvoicingContent() {
       </div>
 
       {/* Tabs + View Toggle + Search + Filters - Sticky Header */}
-      <div className="sticky top-0 z-40 bg-gray-50 dark:bg-gray-900 backdrop-blur-sm shadow-md mb-6 pt-4 pb-4 -mx-8 px-8">
+      <div
+        ref={filtersRef}
+        className="sticky top-0 z-40 bg-gray-50 dark:bg-gray-900 backdrop-blur-sm shadow-md mb-6 pt-4 pb-4 -mx-8 px-8"
+      >
         {/* Tabs + View Toggle */}
         <div className="mb-6 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-end justify-between">
@@ -655,6 +662,7 @@ function InvoicingContent() {
       {viewMode === "table" ?
         <InvoicingTable
           groups={paginatedProjectGroups}
+          headerOffset={headerOffset}
           expandedGroups={expandedGroups}
           onToggleGroup={toggleGroup}
           selectedProjects={selectedProjects}

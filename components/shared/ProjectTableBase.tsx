@@ -25,6 +25,8 @@ interface ProjectTableBaseProps<T> {
   leadingColumn?: (item: T) => ReactNode;
   getRowStyle?: (item: T) => React.CSSProperties;
   stickyHeader?: boolean;
+  /** Pixel offset for the sticky header (e.g. height of a page sticky filter bar). */
+  headerOffset?: number;
   /** External page control — when provided, overrides internal pagination state */
   page?: number;
   /** External page change handler */
@@ -49,6 +51,7 @@ export function ProjectTableBase<T>({
   leadingColumn,
   getRowStyle,
   stickyHeader = false,
+  headerOffset = 0,
   page: externalPage,
   onPageChange: externalOnPageChange,
 }: ProjectTableBaseProps<T>) {
@@ -137,10 +140,12 @@ export function ProjectTableBase<T>({
             className={
               stickyHeader
                 ? // Pin below the page's sticky filter bar (z-40); the opaque
-                  // header row covers rows scrolling underneath it.
-                  "sticky top-0 z-20"
+                  // header row covers rows scrolling underneath it. `headerOffset`
+                  // is the live filter-bar height (0 when there is none).
+                  "sticky z-20"
                 : ""
             }
+            style={stickyHeader ? { top: headerOffset } : undefined}
           >
             <tr className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
               {leadingColumn && <th className="px-6 py-4 w-4 bg-gray-50 dark:bg-gray-900" />}

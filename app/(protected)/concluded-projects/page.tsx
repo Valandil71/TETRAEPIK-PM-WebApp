@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useEffect, useRef } from "react";
+import { useMemo, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, AlertCircle } from "lucide-react";
+import { Loader2, AlertCircle, FileDown, X } from "lucide-react";
 import { useUser } from "@/hooks/user/useUser";
 import { useProjectsWithTranslators } from "@/hooks/project/useProjectsWithTranslators";
 import { useProjectFilters } from "@/hooks/project/useProjectFilters";
@@ -13,10 +13,11 @@ import { ScrollToTopButton } from "@/components/general/ScrollToTopButton";
 import { Pagination } from "@/components/ui/pagination";
 import { ConcludedTable } from "@/components/concluded/ConcludedTable";
 import { ConcludedCard } from "@/components/concluded/ConcludedCard";
+import { ExportProjectsDialog } from "@/components/management/ExportProjectsDialog";
 import { RoleGuard } from "@/components/auth/RoleGuard";
+import { Button } from "@/components/ui/button";
 import { RouteId } from "@/lib/roleAccess";
 import { Card, CardContent } from "@/components/ui/card";
-import { X } from "lucide-react";
 import { useLayoutStore } from "@/lib/stores/useLayoutStore";
 import { useConcludedProjectsPageStore } from "@/lib/stores/useConcludedProjectsPageStore";
 import {
@@ -41,6 +42,9 @@ function ConcludedProjectsContent() {
   const router = useRouter();
   const { loading: userLoading } = useUser();
   const groupExpansionMode = useLayoutStore((state) => state.groupExpansionMode);
+
+  // Export CSV dialog state
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
 
   const {
     viewMode,
@@ -197,38 +201,47 @@ function ConcludedProjectsContent() {
   return (
     <div className="p-8 max-w-screen-2xl mx-auto">
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-gray-900 dark:text-white mb-2">Concluded Projects</h1>
-        <p className="text-gray-500 dark:text-gray-400">
-          Browse projects that have been marked as complete
-        </p>
+      <div className="mb-8 flex items-start justify-between">
+        <div>
+          <h1 className="text-gray-900 dark:text-white mb-2">
+            Concluded Projects
+          </h1>
+          <p className="text-gray-500 dark:text-gray-400">
+            Browse projects that have been marked as complete
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setExportDialogOpen(true)}>
+            <FileDown className="w-4 h-4 mr-2" />
+            Export CSV
+          </Button>
+        </div>
       </div>
 
-      {/* View Toggle + Search + Filters - Sticky Header */}
+      {/* Search + Filters + View Toggle - Sticky Header */}
       <div
         ref={filtersRef}
         className="sticky top-0 z-40 bg-gray-50 dark:bg-gray-900 backdrop-blur-sm shadow-md mb-6 pt-4 pb-4 -mx-8 px-8"
       >
-        <div className="mb-6 border-b border-gray-200 dark:border-gray-700 pb-3">
-          <div className="flex items-end justify-end">
-            <div className="flex flex-col items-center gap-1">
+        <div className="space-y-4">
+          <div className="flex items-center gap-3">
+            <div className="flex-1">
+              <SearchBar
+                value={searchTerm}
+                onChange={(value) => {
+                  setStoredCurrentPage(1);
+                  setSearchTerm(value);
+                }}
+                placeholder="Search by project name"
+              />
+            </div>
+            <div className="flex flex-col items-center gap-1 shrink-0">
               <span className="text-gray-500 dark:text-gray-400 text-xs">
                 View
               </span>
               <ViewToggle view={viewMode} onViewChange={setViewMode} />
             </div>
           </div>
-        </div>
-
-        <div className="space-y-4">
-          <SearchBar
-            value={searchTerm}
-            onChange={(value) => {
-              setStoredCurrentPage(1);
-              setSearchTerm(value);
-            }}
-            placeholder="Search by project name"
-          />
 
           <div className="flex justify-between items-start gap-3">
             <div className="flex flex-wrap gap-3 items-start">
@@ -344,6 +357,12 @@ function ConcludedProjectsContent() {
       />
 
       <ScrollToTopButton />
+
+      {/* Export CSV Dialog */}
+      <ExportProjectsDialog
+        open={exportDialogOpen}
+        onOpenChange={setExportDialogOpen}
+      />
     </div>
   );
 }
