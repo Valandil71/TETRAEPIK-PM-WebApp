@@ -16,6 +16,9 @@ dist/
 .turbo/
 .cache/
 
+# Claude
+.claude/
+
 # npm logs
 npm-debug.log*
 
@@ -27,3 +30,6 @@ npm-debug.log*
 PostgREST_Egress_Plan.md
 estimativa-extras-cliente.md
 proposta-extras-cliente.md
+proposta-extras-cliente-pt.md
+
+
