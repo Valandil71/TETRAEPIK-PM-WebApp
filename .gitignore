@@ -19,9 +19,13 @@ dist/
 # npm logs
 npm-debug.log*
 
+#Claude
+.claude/
+
 # .env
 .env.local
 .env*.local
 
 #.md plans 
+docs/
 PostgREST_Egress_Plan.md
