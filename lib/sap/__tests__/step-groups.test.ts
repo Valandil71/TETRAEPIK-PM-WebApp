@@ -1,6 +1,21 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mapSapSubProjectToProjects } from '@/lib/sap/step-groups';
 import type { SapProject, SapSubProject, SapSubProjectInfo, SapStep } from '@/types/sap';
+
+// mapSapSubProjectToProjects skips groups whose deadlines are all in the past
+// (see lib/sap/step-groups.ts). These fixtures use fixed deadline dates that were
+// authored as future dates; freeze the clock to that authoring window so the
+// past-deadline filter does not drop them and the tests stay stable over time.
+// The earliest offset-adjusted fixture deadline is 2026-04-23T07:00:00Z, so any
+// frozen "today" before that works.
+beforeEach(() => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date('2026-04-17T12:00:00.000Z'));
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 function buildParent(projectId: number, projectName: string): SapProject {
   return {

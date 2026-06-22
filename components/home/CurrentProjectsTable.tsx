@@ -191,6 +191,7 @@ export function CurrentProjectsTable({ projects }: CurrentProjectsTableProps) {
       enablePagination={true}
       itemsPerPage={10}
       getRowKey={(project) => project.id}
+      stickyHeader
     />
   );
 }

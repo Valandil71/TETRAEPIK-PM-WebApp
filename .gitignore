@@ -16,11 +16,11 @@ dist/
 .turbo/
 .cache/
 
+# Claude
+.claude/
+
 # npm logs
 npm-debug.log*
-
-#Claude
-.claude/
 
 # .env
 .env.local
@@ -28,4 +28,5 @@ npm-debug.log*
 
 #.md plans 
 docs/
-PostgREST_Egress_Plan.md
+
+

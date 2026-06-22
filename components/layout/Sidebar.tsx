@@ -13,6 +13,7 @@ import {
   ChevronRight,
   Receipt,
   BarChart3,
+  CheckCircle,
   type LucideIcon,
 } from "lucide-react";
 import { useRoleAccess } from "@/hooks/user/useRoleAccess";
@@ -52,6 +53,12 @@ const allNavItems: NavItemConfig[] = [
     path: "/management",
     icon: FolderKanban,
     label: "Manage Projects",
+    allowedRoles: ["pm", "admin"],
+  },
+  {
+    path: "/concluded-projects",
+    icon: CheckCircle,
+    label: "Concluded Projects",
     allowedRoles: ["pm", "admin"],
   },
   {

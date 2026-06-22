@@ -6,6 +6,10 @@ import {
   matchesLengthFilter,
 } from "@/utils/filterHelpers";
 import {
+  compareProjectsByClosestDeadline,
+  getClosestProjectDeadlineString,
+} from "@/lib/projectGrouping";
+import {
   createDefaultProjectFilterState,
   type ProjectFilterState,
   type ProjectFilterUpdate,
@@ -164,8 +168,7 @@ export function useProjectFilters<T extends FilterableProject>(
       // Due date filter
       if (dueDateFilter) {
         filtered = filtered.filter((p) => {
-          const deadline =
-            p.final_deadline || p.interim_deadline || p.initial_deadline;
+          const deadline = getClosestProjectDeadlineString(p);
           if (!deadline) return false;
           return matchesDueDateFilter(
             deadline,
@@ -200,14 +203,7 @@ export function useProjectFilters<T extends FilterableProject>(
       }
 
       // Sort by deadline (earliest first)
-      return filtered.sort((a, b) => {
-        const dateA = a.final_deadline ? new Date(a.final_deadline).getTime() : 0;
-        const dateB = b.final_deadline ? new Date(b.final_deadline).getTime() : 0;
-        if (!a.final_deadline && !b.final_deadline) return 0;
-        if (!a.final_deadline) return 1;
-        if (!b.final_deadline) return -1;
-        return dateA - dateB;
-      });
+      return filtered.sort(compareProjectsByClosestDeadline);
     },
     [
       deferredSearchTerm,

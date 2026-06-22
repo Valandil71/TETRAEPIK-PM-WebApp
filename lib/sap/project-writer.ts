@@ -15,14 +15,41 @@ interface BuildPayloadOptions {
   includeSapInstructions?: boolean;
 }
 
+/** Shape of the SAP-owned field payload written on insert/update. */
+interface SapUpdatePayload {
+  sap_import_key: SapProjectForImport['sap_import_key'];
+  name: SapProjectForImport['name'];
+  language_in: SapProjectForImport['language_in'];
+  language_out: SapProjectForImport['language_out'];
+  initial_deadline: SapProjectForImport['initial_deadline'];
+  final_deadline: SapProjectForImport['final_deadline'];
+  system: SapProjectForImport['system'];
+  instructions: SapProjectForImport['instructions'];
+  sap_pm: SapProjectForImport['sap_pm'];
+  project_type: SapProjectForImport['project_type'];
+  terminology_key: SapProjectForImport['terminology_key'];
+  lxe_project: SapProjectForImport['lxe_project'];
+  translation_area: SapProjectForImport['translation_area'];
+  work_list: SapProjectForImport['work_list'];
+  graph_id: SapProjectForImport['graph_id'];
+  lxe_projects: SapProjectForImport['lxe_projects'];
+  url: SapProjectForImport['url'];
+  hours: SapProjectForImport['hours'];
+  last_synced_at: SapProjectForImport['last_synced_at'];
+  // Conditionally included; absent (not undefined) when their option is false.
+  sap_instructions?: SapProjectForImport['sap_instructions'];
+  words?: SapProjectForImport['words'];
+  lines?: SapProjectForImport['lines'];
+}
+
 /** The set of SAP-owned fields written on insert/update */
 export function buildSapUpdatePayload(
   data: SapProjectForImport,
   options: BuildPayloadOptions = {}
-) {
+): SapUpdatePayload {
   const { includeVolumes = true, includeSapInstructions = true } = options;
 
-  const payload = {
+  const payload: SapUpdatePayload = {
     sap_import_key: data.sap_import_key,
     name: data.name,
     language_in: data.language_in,
@@ -44,19 +71,16 @@ export function buildSapUpdatePayload(
     last_synced_at: data.last_synced_at,
   };
 
-  const payloadWithInstructions = includeSapInstructions
-    ? { ...payload, sap_instructions: data.sap_instructions }
-    : payload;
-
-  if (!includeVolumes) {
-    return payloadWithInstructions;
+  if (includeSapInstructions) {
+    payload.sap_instructions = data.sap_instructions;
   }
 
-  return {
-    ...payloadWithInstructions,
-    words: data.words,
-    lines: data.lines,
-  };
+  if (includeVolumes) {
+    payload.words = data.words;
+    payload.lines = data.lines;
+  }
+
+  return payload;
 }
 
 /**

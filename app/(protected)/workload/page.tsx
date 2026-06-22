@@ -620,26 +620,27 @@ function WorkloadContent() {
           {workloadStats.projects.length > 0 ?
             <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
               <CardContent className="p-0">
-                <div className="overflow-x-auto">
+                <div className="overflow-x-clip">
                   <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-gray-200 dark:border-gray-700">
-                        <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400">
+                    {/* Sticky column header pins to viewport top while scrolling. */}
+                    <thead className="sticky top-0 z-20">
+                      <tr className="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+                        <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800">
                           Project
                         </th>
-                        <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400">
+                        <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800">
                           System
                         </th>
-                        <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400">
+                        <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800">
                           Translator(s)
                         </th>
-                        <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400">
+                        <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800">
                           Deadline
                         </th>
-                        <th className="text-right py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400">
+                        <th className="text-right py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800">
                           Words
                         </th>
-                        <th className="text-right py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400">
+                        <th className="text-right py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800">
                           Lines
                         </th>
                       </tr>
@@ -797,33 +798,34 @@ function WorkloadContent() {
           {workloadsArray.length > 0 ?
             <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
               <CardContent className="p-0">
-                <div className="overflow-x-auto">
+                <div className="overflow-x-clip">
                   <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-gray-200 dark:border-gray-700">
-                        <th className="w-8 py-3 px-2" />
-                        <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400">
+                    {/* Sticky column header pins to viewport top while scrolling. */}
+                    <thead className="sticky top-0 z-20">
+                      <tr className="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+                        <th className="w-8 py-3 px-2 bg-white dark:bg-gray-800" />
+                        <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800">
                           User
                         </th>
-                        <th className="text-center py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400">
+                        <th className="text-center py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800">
                           Words/Hour
                         </th>
-                        <th className="text-center py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400">
+                        <th className="text-center py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800">
                           Lines/Hour
                         </th>
-                        <th className="text-right py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400">
+                        <th className="text-right py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800">
                           Total Words
                         </th>
-                        <th className="text-right py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400">
+                        <th className="text-right py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800">
                           Total Lines
                         </th>
-                        <th className="text-right py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400">
+                        <th className="text-right py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800">
                           Est. Hours
                         </th>
-                        <th className="text-center py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400">
+                        <th className="text-center py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800">
                           Status
                         </th>
-                        <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400">
+                        <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800">
                           Earliest Deadline
                         </th>
                       </tr>

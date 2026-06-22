@@ -29,11 +29,12 @@ import { useUser } from "@/hooks/user/useUser";
 import { useDefaultFilters } from "@/hooks/settings/useDefaultFilters";
 import {
   getGroupSelectionState,
-  groupProjectsByExactName,
+  groupProjectsForDisplay,
 } from "@/lib/projectGrouping";
 import { useProjectGroupExpansion } from "@/hooks/project/useProjectGroupExpansion";
 import { useProjectListPagination } from "@/hooks/project/useProjectListPagination";
 import { useWindowScrollMemory } from "@/hooks/ui/useWindowScrollMemory";
+import { useStickyHeaderOffset } from "@/hooks/ui/useStickyHeaderOffset";
 import { restoreWindowScrollY } from "@/utils/scrollRestoration";
 
 const isTypingTarget = (target: EventTarget | null) => {
@@ -82,6 +83,9 @@ function AssignProjectsContent() {
     scrollY: storedScrollY,
     setScrollY: setStoredScrollY,
   });
+
+  // Measure the sticky filter bar so the sticky table header can pin below it.
+  const { ref: filtersRef, offset: headerOffset } = useStickyHeaderOffset();
   const selectedProjects = useMemo(
     () => new Set(selectedProjectIds),
     [selectedProjectIds]
@@ -198,26 +202,26 @@ function AssignProjectsContent() {
     return projects;
   }, [allProjects, applyBaseFilters, assignmentFilter, resolvedProjectTypeFilter]);
 
+  const groupedProjects = useMemo(
+    () => groupProjectsForDisplay(filteredProjects),
+    [filteredProjects]
+  );
+
   const {
     currentPage,
     totalPages,
     totalItems,
     itemsPerPage,
-    paginatedItems: paginatedProjects,
+    paginatedItems: paginatedProjectGroups,
     setCurrentPage,
-  } = useProjectListPagination(filteredProjects, {
+  } = useProjectListPagination(groupedProjects, {
     currentPage: storedCurrentPage,
     onPageChange: setStoredCurrentPage,
   });
 
-  const groupedProjects = useMemo(
-    () => groupProjectsByExactName(paginatedProjects),
-    [paginatedProjects]
-  );
-
   const { expandedGroups, toggleGroup, expandGroup } =
     useProjectGroupExpansion({
-      groups: groupedProjects,
+      groups: paginatedProjectGroups,
       defaultExpanded: groupExpansionMode === "expandAll",
     });
 
@@ -232,7 +236,7 @@ function AssignProjectsContent() {
   };
 
   const handleGroupSelection = (groupKey: string) => {
-    const group = groupedProjects.find((g) => g.key === groupKey);
+    const group = paginatedProjectGroups.find((g) => g.key === groupKey);
     if (!group) return;
 
     const groupProjectIds = group.projects.map((project) => project.id);
@@ -388,7 +392,10 @@ function AssignProjectsContent() {
       </div>
 
       {/* Search and Filters - Sticky Header */}
-      <div className="sticky top-0 z-40 bg-gray-50 dark:bg-gray-900 backdrop-blur-sm shadow-md mb-6 pt-4 pb-4 -mx-8 px-8 space-y-4">
+      <div
+        ref={filtersRef}
+        className="sticky top-0 z-40 bg-gray-50 dark:bg-gray-900 backdrop-blur-sm shadow-md mb-6 pt-4 pb-4 -mx-8 px-8 space-y-4"
+      >
         <div className="flex flex-wrap gap-4 items-end">
           <SearchBar
             value={searchTerm}
@@ -504,7 +511,8 @@ function AssignProjectsContent() {
       {/* Table or Card View */}
       {viewMode === "table" ?
         <ProjectAssignTable
-          groups={groupedProjects}
+          groups={paginatedProjectGroups}
+          headerOffset={headerOffset}
           expandedGroups={expandedGroups}
           onToggleGroup={toggleGroup}
           selectedProjects={selectedProjects}
@@ -513,7 +521,7 @@ function AssignProjectsContent() {
           onRowClick={handleSelection}
         />
       : <ProjectAssignCard
-          groups={groupedProjects}
+          groups={paginatedProjectGroups}
           expandedGroups={expandedGroups}
           onToggleGroup={toggleGroup}
           selectedProjects={selectedProjects}

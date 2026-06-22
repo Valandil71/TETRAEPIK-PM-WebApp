@@ -217,6 +217,7 @@ export function MyProjectsTable({
       enablePagination={false}
       rowClassName="group"
       getRowKey={(assignment) => `${assignment.project_id}-${assignment.user_id}`}
+      stickyHeader
     />
   );
 }

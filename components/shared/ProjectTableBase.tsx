@@ -25,6 +25,8 @@ interface ProjectTableBaseProps<T> {
   leadingColumn?: (item: T) => ReactNode;
   getRowStyle?: (item: T) => React.CSSProperties;
   stickyHeader?: boolean;
+  /** Pixel offset for the sticky header (e.g. height of a page sticky filter bar). */
+  headerOffset?: number;
   /** External page control — when provided, overrides internal pagination state */
   page?: number;
   /** External page change handler */
@@ -49,6 +51,7 @@ export function ProjectTableBase<T>({
   leadingColumn,
   getRowStyle,
   stickyHeader = false,
+  headerOffset = 0,
   page: externalPage,
   onPageChange: externalOnPageChange,
 }: ProjectTableBaseProps<T>) {
@@ -122,17 +125,34 @@ export function ProjectTableBase<T>({
 
   return (
     <div
-      className={`bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden ${className}`}
+      // When the header is sticky it must pin to the window as the page scrolls,
+      // so the card itself must not become a scroll container. `overflow-hidden`
+      // (and the `overflow-x-auto` wrapper below) clip `position: sticky` on the
+      // vertical axis, so we drop them in sticky mode. `overflow-x-clip` keeps the
+      // rounded corners without establishing a scroll container that breaks sticky.
+      className={`bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 ${
+        stickyHeader ? "overflow-x-clip" : "overflow-hidden"
+      } ${className}`}
     >
-      <div className="overflow-x-auto">
+      <div className={stickyHeader ? "" : "overflow-x-auto"}>
         <table className="w-full text-sm">
-          <thead className={stickyHeader ? "sticky top-0 z-10" : ""}>
+          <thead
+            className={
+              stickyHeader
+                ? // Pin below the page's sticky filter bar (z-40); the opaque
+                  // header row covers rows scrolling underneath it. `headerOffset`
+                  // is the live filter-bar height (0 when there is none).
+                  "sticky z-20"
+                : ""
+            }
+            style={stickyHeader ? { top: headerOffset } : undefined}
+          >
             <tr className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
-              {leadingColumn && <th className="px-6 py-4 w-4" />}
+              {leadingColumn && <th className="px-6 py-4 w-4 bg-gray-50 dark:bg-gray-900" />}
               {columns.map((column, index) => (
                 <th
                   key={index}
-                  className={`px-6 py-4 text-left text-gray-700 dark:text-gray-300 ${column.className || ""}`}
+                  className={`px-6 py-4 text-left text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900 ${column.className || ""}`}
                 >
                   {column.header}
                 </th>

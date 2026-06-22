@@ -9,6 +9,7 @@ export const RouteId = {
   PROJECT: "project",
   ASSIGN_PROJECTS: "assign-projects",
   MANAGEMENT: "management",
+  CONCLUDED_PROJECTS: "concluded-projects",
   WORKLOAD: "workload",
   NEW_PROJECT: "new-project",
   INVOICING: "invoicing",
@@ -25,6 +26,7 @@ const routeAccessMap: Record<RouteIdType, UserRole[]> = {
   [RouteId.PROJECT]: ["employee", "pm", "admin"], // Translators have additional assignment check
   [RouteId.ASSIGN_PROJECTS]: ["pm", "admin"],
   [RouteId.MANAGEMENT]: ["pm", "admin"],
+  [RouteId.CONCLUDED_PROJECTS]: ["pm", "admin"],
   [RouteId.WORKLOAD]: ["pm", "admin"],
   [RouteId.NEW_PROJECT]: ["pm", "admin"],
   [RouteId.INVOICING]: ["admin"],
@@ -61,6 +63,12 @@ export const navItems: NavItem[] = [
     path: "/management",
     label: "Manage Projects",
     routeId: RouteId.MANAGEMENT,
+    allowedRoles: ["pm", "admin"],
+  },
+  {
+    path: "/concluded-projects",
+    label: "Concluded Projects",
+    routeId: RouteId.CONCLUDED_PROJECTS,
     allowedRoles: ["pm", "admin"],
   },
   {

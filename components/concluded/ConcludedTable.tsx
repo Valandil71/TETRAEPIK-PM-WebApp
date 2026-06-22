@@ -11,35 +11,27 @@ import type { ProjectWithTranslators } from "@/types/project";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { DeadlineDisplay } from "@/components/general/DeadlineDisplay";
 import { ProjectColorLegendTooltip } from "@/components/shared/ProjectColorLegendTooltip";
-import { Checkbox } from "@/components/ui/checkbox";
 import type { ProjectGroup } from "@/lib/projectGrouping";
-import {
-  getGroupDisplayName,
-  getGroupSelectionState,
-} from "@/lib/projectGrouping";
+import { getGroupDisplayName } from "@/lib/projectGrouping";
 
-interface InvoicingTableProps {
+interface ConcludedTableProps {
   groups: ProjectGroup<ProjectWithTranslators>[];
   expandedGroups: Set<string>;
   onToggleGroup: (groupKey: string) => void;
-  selectedProjects: Set<number>;
   onRowClick: (id: number, e: React.MouseEvent) => void;
-  onSelection: (projectId: number) => void;
-  onGroupSelection: (groupKey: string) => void;
   /** Pixel offset for the sticky header so it pins below the page filter bar. */
   headerOffset?: number;
 }
 
-export function InvoicingTable({
+// Read-only table of completed projects. No selection or row actions — this is an
+// archive view. The sticky <thead> pins below the page filter bar (see Part B).
+export function ConcludedTable({
   groups,
   expandedGroups,
   onToggleGroup,
-  selectedProjects,
   onRowClick,
-  onSelection,
-  onGroupSelection,
   headerOffset = 0,
-}: InvoicingTableProps) {
+}: ConcludedTableProps) {
   const { getSystemColorPreview } = useColorSettings();
   const { exclusionSet } = useInstructionExclusions(null);
 
@@ -50,67 +42,60 @@ export function InvoicingTable({
     return (
       <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden mb-6">
         <div className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
-          No projects found
+          No concluded projects found
         </div>
       </div>
     );
   }
 
   return (
-    // overflow-x-clip keeps rounded corners without becoming a scroll container
-    // that would clip the sticky <thead> on the vertical axis.
     <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-x-clip mb-6">
       <div>
         <table className="w-full text-sm">
-          {/* Sticky column header: pins below the page filter bar (z-40) while
-              scrolling rows. z-20 keeps it under the filter bar; opaque cell
-              backgrounds prevent rows showing through. */}
           <thead className="sticky z-20" style={{ top: headerOffset }}>
             <tr className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
-              <th className="px-6 py-4 w-4 bg-gray-50 dark:bg-gray-900" />
               <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300 w-12 bg-gray-50 dark:bg-gray-900" />
-              <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900">System</th>
-              <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900">Project Name</th>
-              <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300 text-center bg-gray-50 dark:bg-gray-900">Invoiced</th>
-              <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300 text-center bg-gray-50 dark:bg-gray-900">Paid</th>
-              <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900">Collaborator(s)</th>
-              <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900">Due Date</th>
-              <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900">Instructions</th>
+              <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900">
+                System
+              </th>
+              <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900">
+                Project Name
+              </th>
+              <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900">
+                Languages
+              </th>
+              <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900">
+                Collaborator(s)
+              </th>
+              <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900">
+                Due Date
+              </th>
+              <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900">
+                Instructions
+              </th>
             </tr>
           </thead>
           <tbody>
             {groups.map((group) => {
               const isExpanded = expandedGroups.has(group.key);
               const isGrouped = group.projects.length > 1;
-              const groupProjectIds = group.projects.map((project) => project.id);
-              const groupSelectionState = getGroupSelectionState(
-                groupProjectIds,
-                selectedProjects
-              );
-              const isChecked = groupSelectionState === "checked";
-              const isIndeterminate = groupSelectionState === "indeterminate";
 
               return (
                 <Fragment key={group.key}>
                   {isGrouped && (
                     <tr className="border-b border-gray-200 dark:border-gray-700 bg-blue-50/60 dark:bg-blue-900/10">
-                      <td className="px-6 py-3">
-                        <Checkbox
-                          checked={isIndeterminate ? "indeterminate" : isChecked}
-                          onCheckedChange={() => onGroupSelection(group.key)}
-                          aria-label={`Select all projects in ${group.name}`}
-                        />
-                      </td>
-                      <td colSpan={8} className="px-6 py-3">
+                      <td colSpan={7} className="px-6 py-3">
                         <button
                           type="button"
                           onClick={() => onToggleGroup(group.key)}
                           className="w-full text-left flex items-center justify-between cursor-pointer"
                         >
                           <div className="flex items-center gap-2 text-gray-900 dark:text-white">
-                            {isExpanded ?
+                            {isExpanded ? (
                               <ChevronDown className="w-4 h-4 text-gray-500" />
-                            : <ChevronRight className="w-4 h-4 text-gray-500" />}
+                            ) : (
+                              <ChevronRight className="w-4 h-4 text-gray-500" />
+                            )}
                             <span className="font-semibold">
                               {formatProjectName(getGroupDisplayName(group.name))}
                             </span>
@@ -130,15 +115,6 @@ export function InvoicingTable({
                         className="border-b border-gray-200 dark:border-gray-700 hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-colors cursor-pointer"
                         onClick={(e) => onRowClick(project.id, e)}
                       >
-                        <td className="px-6 py-4">
-                          <input
-                            type="checkbox"
-                            checked={selectedProjects.has(project.id)}
-                            onChange={() => onSelection(project.id)}
-                            className="outline-style w-4 h-4 rounded cursor-pointer"
-                            onClick={(e) => e.stopPropagation()}
-                          />
-                        </td>
                         <td className="px-6 py-4">
                           <ProjectColorLegendTooltip
                             status={project.status}
@@ -162,30 +138,11 @@ export function InvoicingTable({
                             {formatProjectName(project.name)}
                           </span>
                         </td>
-                        <td className="px-6 py-4 text-center">
-                          <span
-                            className={`inline-flex items-center px-2.5 py-1 rounded-lg text-sm ${
-                              project.invoiced ?
-                                "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                              : "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300"
-                            }`}
-                          >
-                            {project.invoiced ? "Yes" : "No"}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-center">
-                          <span
-                            className={`inline-flex items-center px-2.5 py-1 rounded-lg text-sm ${
-                              project.paid ?
-                                "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                              : "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300"
-                            }`}
-                          >
-                            {project.paid ? "Yes" : "No"}
-                          </span>
+                        <td className="px-6 py-4 text-gray-700 dark:text-gray-300">
+                          {project.language_in} → {project.language_out}
                         </td>
                         <td className="px-6 py-4">
-                          {project.translators.length > 0 ?
+                          {project.translators.length > 0 ? (
                             <div className="flex flex-wrap gap-2">
                               {project.translators.map((translator) => (
                                 <div
@@ -204,10 +161,11 @@ export function InvoicingTable({
                                 </div>
                               ))}
                             </div>
-                          : <span className="text-gray-400 dark:text-gray-500 text-xs italic">
+                          ) : (
+                            <span className="text-gray-400 dark:text-gray-500 text-xs italic">
                               Not assigned
                             </span>
-                          }
+                          )}
                         </td>
                         <td className="px-6 py-4">
                           <DeadlineDisplay
@@ -217,11 +175,13 @@ export function InvoicingTable({
                           />
                         </td>
                         <td className="px-6 py-4 text-gray-500 dark:text-gray-400 text-sm max-w-xs truncate">
-                          {getInstructionsPreview({
-                            instructions: project.instructions,
-                            sapInstructions: project.sap_instructions,
-                            exclusionSet,
-                          }).displayText}
+                          {
+                            getInstructionsPreview({
+                              instructions: project.instructions,
+                              sapInstructions: project.sap_instructions,
+                              exclusionSet,
+                            }).displayText
+                          }
                         </td>
                       </tr>
                     ))}
@@ -234,4 +194,3 @@ export function InvoicingTable({
     </div>
   );
 }
-

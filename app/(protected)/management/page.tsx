@@ -38,10 +38,11 @@ import { useProjectFilters } from "@/hooks/project/useProjectFilters";
 import { useManagementPageStore } from "@/lib/stores/useManagementPageStore";
 import { useLayoutStore } from "@/lib/stores/useLayoutStore";
 import type { SapInstructionEntry } from "@/types/project";
-import { groupProjectsByExactName } from "@/lib/projectGrouping";
+import { groupProjectsForDisplay } from "@/lib/projectGrouping";
 import { useProjectGroupExpansion } from "@/hooks/project/useProjectGroupExpansion";
 import { useProjectListPagination } from "@/hooks/project/useProjectListPagination";
 import { useWindowScrollMemory } from "@/hooks/ui/useWindowScrollMemory";
+import { useStickyHeaderOffset } from "@/hooks/ui/useStickyHeaderOffset";
 import {
   restoreElementIntoView,
   restoreWindowScrollY,
@@ -76,6 +77,9 @@ function ProjectManagementContent() {
   }
 
   const isSapImportRunning = sapImportStatus?.status === "running";
+
+  // Measure the sticky filter bar so the sticky table header can pin below it.
+  const { ref: filtersRef, offset: headerOffset } = useStickyHeaderOffset();
 
   const supabase = createBrowserClient(supabaseUrl, supabaseKey);
 
@@ -311,14 +315,19 @@ function ProjectManagementContent() {
     return projects;
   }, [allProjects, activeTab, categorizedProjects, applyBaseFilters, resolvedProjectTypeFilter]);
 
+  const groupedProjects = useMemo(
+    () => groupProjectsForDisplay(filteredProjects),
+    [filteredProjects]
+  );
+
   const {
     currentPage,
     totalPages,
     totalItems,
     itemsPerPage,
-    paginatedItems: paginatedProjects,
+    paginatedItems: paginatedProjectGroups,
     setCurrentPage,
-  } = useProjectListPagination(filteredProjects, {
+  } = useProjectListPagination(groupedProjects, {
     currentPage: storedCurrentPage,
     onPageChange: setStoredCurrentPage,
   });
@@ -368,19 +377,14 @@ function ProjectManagementContent() {
     shouldScrollToTop,
     storedScrollY,
     viewMode,
-    paginatedProjects,
+    paginatedProjectGroups,
   ]);
-
-  const groupedProjects = useMemo(
-    () => groupProjectsByExactName(paginatedProjects),
-    [paginatedProjects]
-  );
 
   const groupExpansionMode = useLayoutStore((state) => state.groupExpansionMode);
 
   const { expandedGroups, toggleGroup } =
     useProjectGroupExpansion({
-      groups: groupedProjects,
+      groups: paginatedProjectGroups,
       defaultExpanded: groupExpansionMode === "expandAll",
     });
 
@@ -827,7 +831,10 @@ function ProjectManagementContent() {
       </div>
 
       {/* Tabs + View Toggle + Search + Filters - Sticky Header */}
-      <div className="sticky top-0 z-40 bg-gray-50 dark:bg-gray-900 backdrop-blur-sm shadow-md mb-6 pt-4 pb-4 -mx-8 px-8">
+      <div
+        ref={filtersRef}
+        className="sticky top-0 z-40 bg-gray-50 dark:bg-gray-900 backdrop-blur-sm shadow-md mb-6 pt-4 pb-4 -mx-8 px-8"
+      >
         {/* Tabs + View Toggle */}
         <div className="mb-6 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-end justify-between">
@@ -954,7 +961,8 @@ function ProjectManagementContent() {
       {/* Table or Card View */}
       {viewMode === "table" ?
         <ManagementTable
-          groups={groupedProjects}
+          groups={paginatedProjectGroups}
+          headerOffset={headerOffset}
           expandedGroups={expandedGroups}
           onToggleGroup={toggleGroup}
           openMenu={openMenu}
@@ -981,7 +989,7 @@ function ProjectManagementContent() {
           }
         />
       : <ManagementCard
-          groups={groupedProjects}
+          groups={paginatedProjectGroups}
           expandedGroups={expandedGroups}
           onToggleGroup={toggleGroup}
           openMenu={openMenu}
