@@ -2,7 +2,7 @@
 
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useColorSettings } from "@/hooks/settings/useColorSettings";
-import { getSystemColorStyle } from "@/utils/projectTableHelpers";
+import { getSystemColorStyle, getLanguageColorStyle } from "@/utils/projectTableHelpers";
 import { formatProjectName } from "@/utils/formatters";
 import { getInstructionsPreview } from "@/utils/instructionsPreview";
 import { useInstructionExclusions } from "@/hooks/settings/useInstructionExclusions";
@@ -26,11 +26,13 @@ export function ConcludedCard({
   onToggleGroup,
   onCardClick,
 }: ConcludedCardProps) {
-  const { getSystemColorPreview } = useColorSettings();
+  const { getSystemColorPreview, getLanguageColorPreview } = useColorSettings();
   const { exclusionSet } = useInstructionExclusions(null);
 
   const getSystemColorStyleLocal = (system: string) =>
     getSystemColorStyle(system, getSystemColorPreview);
+  const getLanguageColorStyleLocal = (langIn: string, langOut: string) =>
+    getLanguageColorStyle(langIn, langOut, getLanguageColorPreview);
 
   const renderProjectCard = (project: ProjectWithTranslators) => (
     <div
@@ -46,10 +48,19 @@ export function ConcludedCard({
           langOut={project.language_out}
           className="shrink-0 mt-1"
         >
-          <div
-            className="w-3 h-3 rounded"
-            style={getSystemColorStyleLocal(project.system)}
-          />
+          <div className="flex flex-col items-center">
+            <div
+              className="w-3 h-3 rounded"
+              style={getSystemColorStyleLocal(project.system)}
+            />
+            <div
+              className="w-3 h-1 mt-0.5"
+              style={getLanguageColorStyleLocal(
+                project.language_in || "",
+                project.language_out || ""
+              )}
+            />
+          </div>
         </ProjectColorLegendTooltip>
         <div className="flex-1 min-w-0">
           <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-sm mb-2">

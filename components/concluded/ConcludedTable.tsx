@@ -3,7 +3,7 @@
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { Fragment } from "react";
 import { useColorSettings } from "@/hooks/settings/useColorSettings";
-import { getSystemColorStyle } from "@/utils/projectTableHelpers";
+import { getSystemColorStyle, getLanguageColorStyle } from "@/utils/projectTableHelpers";
 import { formatProjectName } from "@/utils/formatters";
 import { getInstructionsPreview } from "@/utils/instructionsPreview";
 import { useInstructionExclusions } from "@/hooks/settings/useInstructionExclusions";
@@ -32,11 +32,13 @@ export function ConcludedTable({
   onRowClick,
   headerOffset = 0,
 }: ConcludedTableProps) {
-  const { getSystemColorPreview } = useColorSettings();
+  const { getSystemColorPreview, getLanguageColorPreview } = useColorSettings();
   const { exclusionSet } = useInstructionExclusions(null);
 
   const getSystemColorStyleLocal = (system: string) =>
     getSystemColorStyle(system, getSystemColorPreview);
+  const getLanguageColorStyleLocal = (langIn: string, langOut: string) =>
+    getLanguageColorStyle(langIn, langOut, getLanguageColorPreview);
 
   if (groups.length === 0) {
     return (
@@ -122,10 +124,19 @@ export function ConcludedTable({
                             langIn={project.language_in}
                             langOut={project.language_out}
                           >
-                            <div
-                              className="w-3 h-3 rounded"
-                              style={getSystemColorStyleLocal(project.system)}
-                            />
+                            <div className="flex flex-col items-center">
+                              <div
+                                className="w-3 h-3 rounded"
+                                style={getSystemColorStyleLocal(project.system)}
+                              />
+                              <div
+                                className="w-3 h-1 mt-0.5"
+                                style={getLanguageColorStyleLocal(
+                                  project.language_in || "",
+                                  project.language_out || ""
+                                )}
+                              />
+                            </div>
                           </ProjectColorLegendTooltip>
                         </td>
                         <td className="px-6 py-4">
