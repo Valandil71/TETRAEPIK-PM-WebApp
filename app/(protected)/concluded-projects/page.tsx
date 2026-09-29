@@ -6,6 +6,10 @@ import { Loader2, AlertCircle, FileDown, X } from "lucide-react";
 import { useUser } from "@/hooks/user/useUser";
 import { useProjectsWithTranslators } from "@/hooks/project/useProjectsWithTranslators";
 import { useProjectFilters } from "@/hooks/project/useProjectFilters";
+import {
+  PAST_DUE_DATE_OPTIONS,
+  getTodayInLisbon,
+} from "@/utils/filterHelpers";
 import { FilterDropdown } from "@/components/general/FilterDropdown";
 import { ViewToggle } from "@/components/general/ViewToggle";
 import { SearchBar } from "@/components/general/SearchBar";
@@ -78,6 +82,8 @@ function ConcludedProjectsContent() {
     [projectsData]
   );
 
+  const maxDueDate = getTodayInLisbon();
+
   const {
     searchTerm,
     setSearchTerm,
@@ -104,6 +110,8 @@ function ConcludedProjectsContent() {
   } = useProjectFilters(completedProjects, {
     filters: storedFilters,
     onFiltersChange: setStoredFilters,
+    customDueDateMax: maxDueDate,
+    dueDateCalendar: "lisbon",
   });
 
   const filteredProjects = useMemo(() => {
@@ -256,20 +264,14 @@ function ConcludedProjectsContent() {
               />
               <FilterDropdown
                 label="Due Date"
-                options={[
-                  "Today",
-                  "In 1 day",
-                  "In 3 days",
-                  "In a week",
-                  "In a month",
-                  "Custom date",
-                ]}
+                options={PAST_DUE_DATE_OPTIONS}
                 selected={dueDateFilter}
                 onSelect={(value) => {
                   setStoredCurrentPage(1);
                   setDueDateFilter(value);
                 }}
                 customDateValue={customDueDate}
+                customDateMax={maxDueDate}
                 onCustomDateChange={(value) => {
                   setStoredCurrentPage(1);
                   setCustomDueDate(value);

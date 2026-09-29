@@ -10,6 +10,9 @@ interface FilterDropdownProps {
   onSelect: (value: string | null) => void;
   customDateValue?: string;
   onCustomDateChange?: (date: string) => void;
+  /** Earliest / latest selectable custom date (YYYY-MM-DD, inclusive). */
+  customDateMin?: string;
+  customDateMax?: string;
 }
 
 export function FilterDropdown({
@@ -19,6 +22,8 @@ export function FilterDropdown({
   onSelect,
   customDateValue,
   onCustomDateChange,
+  customDateMin,
+  customDateMax,
 }: FilterDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -49,9 +54,14 @@ export function FilterDropdown({
     }
   };
 
+  const effectiveDate =
+    customDateValue && customDateMax && customDateValue > customDateMax ?
+      customDateMax
+    : customDateValue;
+
   const displayValue =
-    selected === "Custom date" && customDateValue ?
-      `Until ${customDateValue}`
+    selected === "Custom date" && effectiveDate ?
+      `Until ${effectiveDate}`
     : selected || label;
 
   const handleClearFilter = (e: React.MouseEvent) => {
@@ -124,8 +134,18 @@ export function FilterDropdown({
               </div>
               <input
                 type="date"
-                value={customDateValue || ""}
+                aria-label={`Custom ${label.toLowerCase()}`}
+                value={effectiveDate || ""}
+                min={customDateMin}
+                max={customDateMax}
                 onChange={(e) => {
+                  const v = e.target.value;
+                  if (
+                    (customDateMax && v > customDateMax) ||
+                    (customDateMin && v && v < customDateMin)
+                  ) {
+                    return;
+                  }
                   if (onCustomDateChange) {
                     onCustomDateChange(e.target.value);
                     onSelect("Custom date");

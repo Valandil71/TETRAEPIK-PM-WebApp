@@ -1,6 +1,6 @@
 import { act, renderHook } from "@testing-library/react";
 import { useState } from "react";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { useProjectFilters } from "@/hooks/project/useProjectFilters";
 import { createDefaultProjectFilterState } from "@/lib/projectFilterState";
 
@@ -45,6 +45,8 @@ const projects = [
     translators: [],
   },
 ];
+
+afterEach(() => vi.useRealTimers());
 
 function useControlledProjectFilters() {
   const [filters, setFilters] = useState(() => createDefaultProjectFilterState());
@@ -99,5 +101,65 @@ describe("useProjectFilters", () => {
     expect(result.current.applyBaseFilters(projects).map((project) => project.name)).toEqual([
       "Gamma Project",
     ]);
+  });
+
+  it("caps a saved future custom date on past-work pages", () => {
+    const datedProjects = [
+      { ...projects.find((p) => p.name === "Alpha Project")!, final_deadline: "2026-09-29" },
+      { ...projects.find((p) => p.name === "Beta Project")!, final_deadline: "2026-09-30" },
+    ];
+    const savedFilters = {
+      ...createDefaultProjectFilterState(),
+      dueDateFilter: "Custom date",
+      customDueDate: "2026-09-30",
+    };
+    const { result } = renderHook(() =>
+      useProjectFilters(datedProjects, {
+        filters: savedFilters,
+        customDueDateMax: "2026-09-29",
+      })
+    );
+
+    expect(result.current.applyBaseFilters(datedProjects).map((p) => p.name)).toEqual([
+      "Alpha Project",
+    ]);
+  });
+
+  it("keeps future custom dates available on Manage Projects", () => {
+    const datedProjects = [{ ...projects.find((p) => p.name === "Alpha Project")!, final_deadline: "2026-09-30" }];
+    const filters = {
+      ...createDefaultProjectFilterState(),
+      dueDateFilter: "Custom date",
+      customDueDate: "2026-09-30",
+    };
+    const { result } = renderHook(() =>
+      useProjectFilters(datedProjects, { filters })
+    );
+
+    expect(result.current.applyBaseFilters(datedProjects)).toEqual(datedProjects);
+  });
+
+  it("matches today's deadline on past-work pages at Lisbon midnight", () => {
+    const previousTimeZone = process.env.TZ;
+    process.env.TZ = "UTC";
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-28T23:30:00Z"));
+    try {
+      const datedProjects = [
+        { ...projects.find((p) => p.name === "Alpha Project")!, final_deadline: "2026-09-29" },
+        { ...projects.find((p) => p.name === "Beta Project")!, final_deadline: "2026-09-30" },
+      ];
+      const filters = { ...createDefaultProjectFilterState(), dueDateFilter: "Today" };
+      const { result } = renderHook(() =>
+        useProjectFilters(datedProjects, { filters, dueDateCalendar: "lisbon" })
+      );
+
+      expect(result.current.applyBaseFilters(datedProjects).map((p) => p.name)).toEqual([
+        "Alpha Project",
+      ]);
+    } finally {
+      if (previousTimeZone === undefined) delete process.env.TZ;
+      else process.env.TZ = previousTimeZone;
+    }
   });
 });

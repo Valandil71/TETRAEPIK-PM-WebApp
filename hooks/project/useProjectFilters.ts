@@ -4,6 +4,7 @@ import { useState, useMemo, useCallback, useDeferredValue } from "react";
 import {
   matchesDueDateFilter,
   matchesLengthFilter,
+  clampDateToMax,
 } from "@/utils/filterHelpers";
 import {
   compareProjectsByClosestDeadline,
@@ -33,6 +34,10 @@ interface FilterableProject {
 interface UseProjectFiltersOptions {
   filters?: ProjectFilterState;
   onFiltersChange?: (filters: ProjectFilterUpdate) => void;
+  /** Latest allowed custom due date (YYYY-MM-DD); saved later dates are capped. */
+  customDueDateMax?: string;
+  /** Calendar used to compare due dates; existing pages default to local time. */
+  dueDateCalendar?: "local" | "lisbon";
 }
 
 export function useProjectFilters<T extends FilterableProject>(
@@ -173,7 +178,9 @@ export function useProjectFilters<T extends FilterableProject>(
           return matchesDueDateFilter(
             deadline,
             dueDateFilter,
-            customDueDate || undefined
+            clampDateToMax(customDueDate, options?.customDueDateMax) ||
+              undefined,
+            options?.dueDateCalendar
           );
         });
       }
@@ -210,6 +217,8 @@ export function useProjectFilters<T extends FilterableProject>(
       systemFilter,
       dueDateFilter,
       customDueDate,
+      options?.customDueDateMax,
+      options?.dueDateCalendar,
       assignmentStatusFilter,
       sourceLangFilter,
       targetLangFilter,

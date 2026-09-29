@@ -2,12 +2,80 @@
  * Helper functions for filtering projects
  */
 
+const LISBON_TZ = "Europe/Lisbon";
+const lisbonDateFormat = new Intl.DateTimeFormat("en-CA", {
+  timeZone: LISBON_TZ,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+/** Today's calendar date in Europe/Lisbon, as YYYY-MM-DD. */
+export function getTodayInLisbon(now: Date = new Date()): string {
+  return lisbonDateFormat.format(now);
+}
+
+/** Caps a YYYY-MM-DD value at `max` (inclusive); empty stays empty. */
+export function clampDateToMax(value: string, max?: string): string {
+  return value && max && value > max ? max : value;
+}
+
+/** Due-date presets that look backwards (used by pages listing past work). */
+export const PAST_DUE_DATE_OPTIONS = [
+  "Today",
+  "Yesterday",
+  "Last 3 days",
+  "Last week",
+  "Last month",
+  "Custom date",
+];
+
+function toLisbonDay(value: string): string {
+  return value.length > 10 ? getTodayInLisbon(new Date(value)) : value;
+}
+
+function dayNumber(day: string): number {
+  const [y, m, d] = day.split("-").map(Number);
+  return Date.UTC(y, m - 1, d) / 86400000;
+}
+
+function matchesPastDueDateFilter(
+  dueDate: string,
+  filter: string
+): boolean | null {
+  // Days elapsed since the deadline, Lisbon calendar (0 = today).
+  const ago = dayNumber(getTodayInLisbon()) - dayNumber(toLisbonDay(dueDate));
+  switch (filter) {
+    case "Yesterday":
+      return ago === 1;
+    case "Last 3 days":
+      return ago >= 0 && ago <= 3;
+    case "Last week":
+      return ago >= 0 && ago <= 7;
+    case "Last month":
+      return ago >= 0 && ago <= 30;
+    default:
+      return null;
+  }
+}
+
 export function matchesDueDateFilter(
   dueDate: string | null,
   filter: string | null,
-  customDate?: string
+  customDate?: string,
+  calendar: "local" | "lisbon" = "local"
 ): boolean {
   if (!filter || !dueDate) return true;
+
+  const past = matchesPastDueDateFilter(dueDate, filter);
+  if (past !== null) return past;
+
+  if (calendar === "lisbon") {
+    if (filter === "Today") return toLisbonDay(dueDate) === getTodayInLisbon();
+    if (filter === "Custom date" && customDate) {
+      return toLisbonDay(dueDate) <= customDate;
+    }
+  }
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
