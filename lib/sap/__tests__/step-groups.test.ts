@@ -300,4 +300,90 @@ describe('mapSapSubProjectToProjects', () => {
     expect(initialProject?.initial_deadline).toBe('2026-04-23T07:00:00.000Z');
     expect(initialProject?.final_deadline).toBeNull();
   });
+
+  function buildSapEnvironment(contentId: string, system: string, translationArea: string) {
+    return {
+      contentId,
+      environmentName: `SAP Translation System - ${system} / 000 / SAP`,
+      toolType: 'SAP',
+      toolTypeDescription: 'SAP Translation System',
+      projectUrl: '',
+      graphId: [],
+      lxeProject: [],
+      translationArea: [translationArea],
+      worklist: [],
+      is_xtm: false,
+      content_name: 'content',
+      external_project_id: '0000000000',
+      external_system: '',
+    };
+  }
+
+  it('keeps initial (finalVolumeAvailableOn) and final deadline together in one project', () => {
+    const details: SapSubProjectInfo = {
+      subProjectId: '5983-293',
+      subProjectName: 'S4H_2026CW40',
+      terminologyKey: [],
+      environment: [
+        buildSapEnvironment('000001', 'B0X', '074025 - TA'),
+        buildSapEnvironment('000002', 'B0X', '650033 - TA'),
+      ],
+      subProjectSteps: ['000001', '000002'].map((contentId) => ({
+        ...buildStep({
+          contentId,
+          slsLang: 'ptBR',
+          stepText: 'Translate dynamic volume',
+          endDate: '2026-09-30T15:00:00.000Z',
+          volumes: [{ volumeUnit: 'Words', volumeQuantity: contentId === '000001' ? 51 : 0 }],
+        }),
+        finalVolumeAvailable: false,
+        finalVolumeAvailableOn: '2026-09-30T09:00:00.000Z',
+      })),
+    };
+
+    const projects = mapSapSubProjectToProjects(
+      buildSubProject('5983-293', 'S4H_2026CW40'),
+      buildParent(5983, 'S4H'),
+      details,
+      []
+    );
+
+    expect(projects).toHaveLength(1);
+    expect(projects[0].sap_import_key).toBe('STD|B0X|enUS|ptBR|LANGPAIR');
+    expect(projects[0].initial_deadline).toBe('2026-09-30T06:00:00.000Z');
+    expect(projects[0].final_deadline).toBe('2026-09-30T12:00:00.000Z');
+    expect(projects[0].words).toBe(51);
+  });
+
+  it('keeps both deadlines together per translation area for SSE when using finalVolumeAvailableOn', () => {
+    const details: SapSubProjectInfo = {
+      subProjectId: '5164-192',
+      subProjectName: 'Bi-Weekly_UI_2026CW40',
+      terminologyKey: [],
+      environment: [buildSapEnvironment('000001', 'SSE', 'CHR000 - S4HCM: Infinity')],
+      subProjectSteps: [
+        {
+          ...buildStep({
+            contentId: '000001',
+            slsLang: 'ptBR',
+            stepText: 'Translate dynamic volume',
+            endDate: '2026-10-08T15:00:00.000Z',
+          }),
+          finalVolumeAvailableOn: '2026-10-07T01:00:00.000Z',
+        },
+      ],
+    };
+
+    const projects = mapSapSubProjectToProjects(
+      buildSubProject('5164-192', 'Bi-Weekly_UI_2026CW40'),
+      buildParent(5164, 'S4HCM'),
+      details,
+      []
+    );
+
+    expect(projects).toHaveLength(1);
+    expect(projects[0].sap_import_key).toBe('STD|SSE|enUS|ptBR|TA|CHR000');
+    expect(projects[0].initial_deadline).toBe('2026-10-06T22:00:00.000Z');
+    expect(projects[0].final_deadline).toBe('2026-10-08T12:00:00.000Z');
+  });
 });

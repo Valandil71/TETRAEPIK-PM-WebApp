@@ -6,6 +6,7 @@ import type { SapProjectForImport } from '@/types/sap';
 import { TRACKED_FIELDS } from './constants';
 import { collectTrackedChanges, type ReportChanges } from './sync-utils';
 import {
+  appendDeadlineVariantToImportKey,
   getDeadlineVariantFromImportKey,
   stripDeadlineVariantFromImportKey,
 } from './import-keys';
@@ -86,6 +87,7 @@ export function buildSapUpdatePayload(
 /**
  * Find an existing local project matching the given SAP import data.
  * Primary: exact match on sap_subproject_id + sap_import_key.
+ * Unsplit key: also the row previously saved as its FINAL deadline variant.
  * Fallback: legacy match (sap_import_key IS NULL) for migration.
  */
 export async function findExistingProject(
@@ -103,6 +105,21 @@ export async function findExistingProject(
   if (exactMatch.data) return exactMatch;
 
   const deadlineVariant = getDeadlineVariantFromImportKey(data.sap_import_key);
+
+  if (deadlineVariant === null) {
+    // Projects whose initial deadline comes from finalVolumeAvailableOn are no longer split in
+    // INITIAL/FINAL rows. An earlier import may have renamed the existing row to its FINAL key,
+    // so reuse it: it then gets both deadlines and the unsplit key back.
+    const finalVariantMatch = await supabase
+      .from('projects')
+      .select('id')
+      .eq('sap_subproject_id', data.sap_subproject_id)
+      .eq('sap_import_key', appendDeadlineVariantToImportKey(data.sap_import_key, 'FINAL'))
+      .maybeSingle();
+
+    if (finalVariantMatch.error) return finalVariantMatch;
+    if (finalVariantMatch.data) return finalVariantMatch;
+  }
 
   if (deadlineVariant === 'INITIAL') {
     return { data: null, error: null };

@@ -207,8 +207,16 @@ function buildSapImportKey(params: {
   return [...base, 'LANGPAIR'].join('|');
 }
 
-function splitProjectByDeadline(project: SapProjectForImport): SapProjectForImport[] {
-  if (!project.initial_deadline || !project.final_deadline) {
+/**
+ * Splits a project with both deadlines into a FINAL-only and an INITIAL-only row.
+ * Not applied when the initial deadline comes from finalVolumeAvailableOn: that date is a
+ * milestone of the same project, so both deadlines must stay together on one row.
+ */
+function splitProjectByDeadline(
+  project: SapProjectForImport,
+  initialFromFinalVolume: boolean
+): SapProjectForImport[] {
+  if (initialFromFinalVolume || !project.initial_deadline || !project.final_deadline) {
     return [project];
   }
 
@@ -228,9 +236,10 @@ function splitProjectByDeadline(project: SapProjectForImport): SapProjectForImpo
 
 function pushDeadlineSplitProjects(
   results: SapProjectForImport[],
-  project: SapProjectForImport
+  project: SapProjectForImport,
+  initialFromFinalVolume: boolean
 ): void {
-  results.push(...splitProjectByDeadline(project));
+  results.push(...splitProjectByDeadline(project, initialFromFinalVolume));
 }
 
 /**
@@ -292,6 +301,8 @@ export function mapSapSubProjectToProjects(
         existing.hours += group.hours;
         existing.terms += group.terms;
         existing.hasTermsInFwl = existing.hasTermsInFwl || group.hasTermsInFwl;
+        existing.initialFromFinalVolume =
+          existing.initialFromFinalVolume || group.initialFromFinalVolume;
         existing.allSteps.push(...group.allSteps);
       }
     }
@@ -349,7 +360,7 @@ export function mapSapSubProjectToProjects(
           hours: langGroup.hours || null,
           words: langGroup.words || null,
           lines: langGroup.lines || null,
-        });
+        }, langGroup.initialFromFinalVolume === true);
       }
     }
   } else {
@@ -482,7 +493,7 @@ export function mapSapSubProjectToProjects(
         hours: hours || null,
         words: finalWords || null,
         lines: lines || null,
-      });
+      }, langGroup.groups.some((group) => group.initialFromFinalVolume === true));
     }
   }
 

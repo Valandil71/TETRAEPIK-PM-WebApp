@@ -110,9 +110,27 @@ describe('findExistingProject', () => {
     expect(result.data).toEqual({ id: 20 });
   });
 
+  it('matches an unsplit project to the row previously saved with the FINAL deadline key', async () => {
+    const supabase = createSupabaseSequenceMock([
+      { data: null, error: null }, // exact maybeSingle
+      { data: { id: 30 }, error: null }, // FINAL variant key maybeSingle
+    ]);
+
+    const result = await findExistingProject(supabase as never, {
+      ...baseData,
+      sap_import_key: 'k1',
+      initial_deadline: '2026-09-30T06:00:00.000Z',
+      final_deadline: '2026-09-30T12:00:00.000Z',
+    });
+
+    expect(result.error).toBeNull();
+    expect(result.data).toEqual({ id: 30 });
+  });
+
   it('uses compatibility fallback when exact and legacy match fail', async () => {
     const supabase = createSupabaseSequenceMock([
       { data: null, error: null }, // exact maybeSingle
+      { data: null, error: null }, // FINAL variant key maybeSingle
       { data: [{ id: 10 }, { id: 11 }], error: null }, // legacy limit(2)
       { data: [{ id: 22 }, { id: 23 }], error: null }, // compatibility limit(2)
     ]);
