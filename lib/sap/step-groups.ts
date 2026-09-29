@@ -73,11 +73,14 @@ export interface JoinedStepGroup {
   terms: number;
   hasTermsInFwl: boolean;
   allSteps: SapStep[];
+  /** True when initialDeadline came from finalVolumeAvailableOn (takes precedence over TRANSLREGU) */
+  initialFromFinalVolume?: boolean;
 }
 
 /**
  * Group steps by contentId + language pair, joining TRANSLFWL and TRANSLREGU.
- * TRANSLREGU endDate -> initial_deadline
+ * finalVolumeAvailableOn (when present) -> initial_deadline
+ * otherwise TRANSLREGU endDate -> initial_deadline
  * TRANSLFWL endDate -> final_deadline
  */
 export function joinSteps(steps: SapStep[]): JoinedStepGroup[] {
@@ -107,8 +110,20 @@ export function joinSteps(steps: SapStep[]): JoinedStepGroup[] {
 
     const adjustedEndDate = applyDeadlineOffset(step.endDate);
 
+    // finalVolumeAvailableOn defines the initial deadline and overrides TRANSLREGU
+    const adjustedFinalVolumeDate = applyDeadlineOffset(step.finalVolumeAvailableOn);
+    if (adjustedFinalVolumeDate) {
+      if (
+        !group.initialFromFinalVolume ||
+        isLaterIsoDate(adjustedFinalVolumeDate, group.initialDeadline)
+      ) {
+        group.initialDeadline = adjustedFinalVolumeDate;
+      }
+      group.initialFromFinalVolume = true;
+    }
+
     // Deadline assignment based on service step type
-    if (step.serviceStep === 'TRANSLREGU' && adjustedEndDate) {
+    if (step.serviceStep === 'TRANSLREGU' && adjustedEndDate && !group.initialFromFinalVolume) {
       if (isLaterIsoDate(adjustedEndDate, group.initialDeadline)) {
         group.initialDeadline = adjustedEndDate;
       }

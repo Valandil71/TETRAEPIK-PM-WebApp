@@ -69,6 +69,9 @@ export interface SapStep {
   volume?: SapVolume[];
   stepStatusId: string;
   stepStatusDescription: string;
+  /** Only present on some steps. When set, it defines the initial deadline. */
+  finalVolumeAvailable?: boolean;
+  finalVolumeAvailableOn?: string; // ISO date string
   // toolType is on EnvironmentModel per OpenAPI spec, not on steps.
   // Kept optional for backwards compat — extractSystem falls back to environment.
   toolType?: string;
