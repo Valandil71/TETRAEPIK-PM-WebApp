@@ -100,10 +100,10 @@ export function MyProjectsCard({
               {formatProjectName(project.name)}
             </h3>
             <p className="text-gray-500 dark:text-gray-400 text-sm mb-1">
-              Words: {project.words ? formatNumber(project.words) : "-"}
+              Lines: {project.lines ? formatNumber(project.lines) : "-"}
             </p>
             <p className="text-gray-500 dark:text-gray-400 text-sm mb-1">
-              Lines: {project.lines ? formatNumber(project.lines) : "-"}
+              Words: {project.words ? formatNumber(project.words) : "-"}
             </p>
             <div className="text-gray-500 dark:text-gray-400 text-sm mb-1 flex items-center gap-1">
               <span>Due Date:</span>

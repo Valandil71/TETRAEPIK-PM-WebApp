@@ -98,20 +98,20 @@ export function CurrentProjectsTable({ projects }: CurrentProjectsTableProps) {
       ),
     },
     {
-      header: "Words",
-      className: "text-right",
-      render: (project: ProjectWithTranslators) => (
-        <span className="text-gray-700 dark:text-gray-300">
-          {project.words ? formatNumber(project.words) : "-"}
-        </span>
-      ),
-    },
-    {
       header: "Lines",
       className: "text-right",
       render: (project: ProjectWithTranslators) => (
         <span className="text-gray-700 dark:text-gray-300">
           {project.lines ? formatNumber(project.lines) : "-"}
+        </span>
+      ),
+    },
+    {
+      header: "Words",
+      className: "text-right",
+      render: (project: ProjectWithTranslators) => (
+        <span className="text-gray-700 dark:text-gray-300">
+          {project.words ? formatNumber(project.words) : "-"}
         </span>
       ),
     },

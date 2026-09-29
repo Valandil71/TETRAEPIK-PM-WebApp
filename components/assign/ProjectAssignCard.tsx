@@ -113,18 +113,18 @@ export function ProjectAssignCard({
         <div className="space-y-3 mb-4">
           <div className="flex justify-between items-center">
             <span className="text-gray-500 dark:text-gray-400 text-xs">
-              Words
-            </span>
-            <span className="text-gray-900 dark:text-white text-sm">
-              {project.words ? formatNumber(project.words) : "-"}
-            </span>
-          </div>
-          <div className="flex justify-between items-center">
-            <span className="text-gray-500 dark:text-gray-400 text-xs">
               Lines
             </span>
             <span className="text-gray-900 dark:text-white text-sm">
               {project.lines ? formatNumber(project.lines) : "-"}
+            </span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-gray-500 dark:text-gray-400 text-xs">
+              Words
+            </span>
+            <span className="text-gray-900 dark:text-white text-sm">
+              {project.words ? formatNumber(project.words) : "-"}
             </span>
           </div>
           <div className="flex justify-between items-center">

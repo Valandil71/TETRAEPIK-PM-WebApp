@@ -78,8 +78,8 @@ export function ProjectAssignTable({
               <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300 w-12 bg-gray-50 dark:bg-gray-900" />
               <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900">System</th>
               <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900">Project Name</th>
-              <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300 text-right bg-gray-50 dark:bg-gray-900">Words</th>
               <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300 text-right bg-gray-50 dark:bg-gray-900">Lines</th>
+              <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300 text-right bg-gray-50 dark:bg-gray-900">Words</th>
               <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900">Collaborator(s)</th>
               <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900">Due Date</th>
               <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900">Instructions</th>
@@ -201,12 +201,12 @@ export function ProjectAssignTable({
                         </td>
                         <td className="px-6 py-4 text-right">
                           <span className="text-gray-700 dark:text-gray-300">
-                            {project.words ? formatNumber(project.words) : "-"}
+                            {project.lines ? formatNumber(project.lines) : "-"}
                           </span>
                         </td>
                         <td className="px-6 py-4 text-right">
                           <span className="text-gray-700 dark:text-gray-300">
-                            {project.lines ? formatNumber(project.lines) : "-"}
+                            {project.words ? formatNumber(project.words) : "-"}
                           </span>
                         </td>
                         <td className="px-6 py-4">

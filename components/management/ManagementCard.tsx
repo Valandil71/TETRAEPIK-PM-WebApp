@@ -270,17 +270,6 @@ export function ManagementCard({
       <div className="text-gray-500 dark:text-gray-400 text-xs mt-1" onClick={(e) => e.stopPropagation()}>
         {editingProjectId === project.id ? (
           <div className="flex items-center gap-2 flex-wrap">
-            <span>Words:</span>
-            <input
-              type="text"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              value={editWords}
-              onChange={(e) => onEditWordsChange(e.target.value)}
-              onKeyDown={(e) => handleWordsLinesKeyDown(e, project.id)}
-              ref={wordsInputRef}
-              className="no-spinner w-16 px-1.5 py-0.5 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-            />
             <span>Lines:</span>
             <input
               type="text"
@@ -290,6 +279,17 @@ export function ManagementCard({
               onChange={(e) => onEditLinesChange(e.target.value)}
               onKeyDown={(e) => handleWordsLinesKeyDown(e, project.id)}
               ref={linesInputRef}
+              className="no-spinner w-16 px-1.5 py-0.5 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+            />
+            <span>Words:</span>
+            <input
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              value={editWords}
+              onChange={(e) => onEditWordsChange(e.target.value)}
+              onKeyDown={(e) => handleWordsLinesKeyDown(e, project.id)}
+              ref={wordsInputRef}
               className="no-spinner w-16 px-1.5 py-0.5 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
             />
             <button
@@ -311,19 +311,19 @@ export function ManagementCard({
         ) : (
           <div className="inline-flex items-center gap-2">
             <button
-              onClick={() => onStartWordsLinesEdit(project.id, project.words, project.lines, "words")}
-              className="hover:text-blue-500 dark:hover:text-blue-400 cursor-pointer"
-              type="button"
-            >
-              Words: {project.words ? formatNumber(project.words) : "-"}
-            </button>
-            <span>,</span>
-            <button
               onClick={() => onStartWordsLinesEdit(project.id, project.words, project.lines, "lines")}
               className="hover:text-blue-500 dark:hover:text-blue-400 cursor-pointer"
               type="button"
             >
               Lines: {project.lines ? formatNumber(project.lines) : "-"}
+            </button>
+            <span>,</span>
+            <button
+              onClick={() => onStartWordsLinesEdit(project.id, project.words, project.lines, "words")}
+              className="hover:text-blue-500 dark:hover:text-blue-400 cursor-pointer"
+              type="button"
+            >
+              Words: {project.words ? formatNumber(project.words) : "-"}
             </button>
           </div>
         )}

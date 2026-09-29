@@ -374,7 +374,7 @@ export function TranslatorSelectionView({
                       </TooltipProvider>
                     </div>
                     <div className="mt-0.5 text-xs text-gray-500 dark:text-gray-500 pl-5">
-                      {userWorkload.nextWeekWords.toLocaleString()} words • {userWorkload.nextWeekLines.toLocaleString()} lines
+                      {userWorkload.nextWeekLines.toLocaleString()} lines • {userWorkload.nextWeekWords.toLocaleString()} words
                     </div>
                   </div>
 
@@ -405,7 +405,7 @@ export function TranslatorSelectionView({
                       </TooltipProvider>
                     </div>
                     <div className="mt-0.5 text-xs text-gray-500 dark:text-gray-500 pl-5">
-                      {userWorkload.totalWords.toLocaleString()} words • {userWorkload.totalLines.toLocaleString()} lines
+                      {userWorkload.totalLines.toLocaleString()} lines • {userWorkload.totalWords.toLocaleString()} words
                     </div>
                   </div>
                 </div>

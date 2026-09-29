@@ -151,15 +151,15 @@ export function ProjectDetailsCard({
             <div>
               <SectionHeader title="Metrics" />
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {project.words != null && (
-                  <DetailItem icon={FileText} iconBg="bg-purple-100 dark:bg-purple-900/30" iconColor="text-purple-600 dark:text-purple-400" label="Word Count">
-                    {formatNumber(project.words)} words
-                  </DetailItem>
-                )}
-
                 {project.lines != null && (
                   <DetailItem icon={FileText} iconBg="bg-indigo-100 dark:bg-indigo-900/30" iconColor="text-indigo-600 dark:text-indigo-400" label="Lines">
                     {formatNumber(project.lines)}
+                  </DetailItem>
+                )}
+
+                {project.words != null && (
+                  <DetailItem icon={FileText} iconBg="bg-purple-100 dark:bg-purple-900/30" iconColor="text-purple-600 dark:text-purple-400" label="Word Count">
+                    {formatNumber(project.words)} words
                   </DetailItem>
                 )}
 

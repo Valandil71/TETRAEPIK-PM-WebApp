@@ -109,18 +109,18 @@ export function ProjectTable({ showPast = false }: ProjectTableProps) {
       ),
     },
     {
-      header: "Words",
-      render: (project: ProjectWithTranslators) => (
-        <span onClick={() => router.push(`/project/${project.id}`)}>
-          {project.words ?? "-"}
-        </span>
-      ),
-    },
-    {
       header: "Lines",
       render: (project: ProjectWithTranslators) => (
         <span onClick={() => router.push(`/project/${project.id}`)}>
           {project.lines ?? "-"}
+        </span>
+      ),
+    },
+    {
+      header: "Words",
+      render: (project: ProjectWithTranslators) => (
+        <span onClick={() => router.push(`/project/${project.id}`)}>
+          {project.words ?? "-"}
         </span>
       ),
     },

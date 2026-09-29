@@ -110,20 +110,20 @@ export function MyProjectsTable({
       ),
     },
     {
-      header: "Words",
-      className: "text-right",
-      render: (assignment: ProjectAssignment) => (
-        <span className="text-gray-700 dark:text-gray-300">
-          {assignment.projects.words ? formatNumber(assignment.projects.words) : "-"}
-        </span>
-      ),
-    },
-    {
       header: "Lines",
       className: "text-right",
       render: (assignment: ProjectAssignment) => (
         <span className="text-gray-700 dark:text-gray-300">
           {assignment.projects.lines ? formatNumber(assignment.projects.lines) : "-"}
+        </span>
+      ),
+    },
+    {
+      header: "Words",
+      className: "text-right",
+      render: (assignment: ProjectAssignment) => (
+        <span className="text-gray-700 dark:text-gray-300">
+          {assignment.projects.words ? formatNumber(assignment.projects.words) : "-"}
         </span>
       ),
     },

@@ -566,25 +566,6 @@ function WorkloadContent() {
               </CardContent>
             </Card>
 
-            {/* Total Words */}
-            <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
-              <CardContent className="p-6">
-                <div className="flex items-center gap-4">
-                  <div className="p-3 rounded-lg bg-green-100 dark:bg-green-900/30">
-                    <Type className="w-6 h-6 text-green-600 dark:text-green-400" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                      Total Words
-                    </p>
-                    <p className="text-3xl font-semibold text-gray-900 dark:text-white">
-                      {workloadStats.totalWords.toLocaleString(NUMBER_LOCALE)}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
             {/* Total Lines */}
             <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
               <CardContent className="p-6">
@@ -615,6 +596,25 @@ function WorkloadContent() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Total Words */}
+            <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 rounded-lg bg-green-100 dark:bg-green-900/30">
+                    <Type className="w-6 h-6 text-green-600 dark:text-green-400" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      Total Words
+                    </p>
+                    <p className="text-3xl font-semibold text-gray-900 dark:text-white">
+                      {workloadStats.totalWords.toLocaleString(NUMBER_LOCALE)}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
 
           {/* Projects List */}
@@ -639,10 +639,10 @@ function WorkloadContent() {
                           Deadline
                         </th>
                         <th className="text-right py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800">
-                          Words
+                          Lines
                         </th>
                         <th className="text-right py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800">
-                          Lines
+                          Words
                         </th>
                       </tr>
                     </thead>
@@ -711,10 +711,10 @@ function WorkloadContent() {
                               />
                             </td>
                             <td className="py-3 px-4 text-sm text-gray-900 dark:text-white text-right">
-                              {(project.words || 0).toLocaleString(NUMBER_LOCALE)}
+                              {(project.lines || 0).toLocaleString(NUMBER_LOCALE)}
                             </td>
                             <td className="py-3 px-4 text-sm text-gray-900 dark:text-white text-right">
-                              {(project.lines || 0).toLocaleString(NUMBER_LOCALE)}
+                              {(project.words || 0).toLocaleString(NUMBER_LOCALE)}
                             </td>
                           </tr>
                         );
@@ -729,10 +729,10 @@ function WorkloadContent() {
                           Total
                         </td>
                         <td className="py-3 px-4 text-sm font-semibold text-gray-900 dark:text-white text-right">
-                          {workloadStats.totalWords.toLocaleString(NUMBER_LOCALE)}
+                          {workloadStats.totalLines.toLocaleString(NUMBER_LOCALE)}
                         </td>
                         <td className="py-3 px-4 text-sm font-semibold text-gray-900 dark:text-white text-right">
-                          {workloadStats.totalLines.toLocaleString(NUMBER_LOCALE)}
+                          {workloadStats.totalWords.toLocaleString(NUMBER_LOCALE)}
                         </td>
                       </tr>
                     </tfoot>
@@ -804,16 +804,16 @@ function WorkloadContent() {
                           User
                         </th>
                         <th className="text-center py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800">
-                          Words/Hour
-                        </th>
-                        <th className="text-center py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800">
                           Lines/Hour
                         </th>
-                        <th className="text-right py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800">
-                          Total Words
+                        <th className="text-center py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800">
+                          Words/Hour
                         </th>
                         <th className="text-right py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800">
                           Total Lines
+                        </th>
+                        <th className="text-right py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800">
+                          Total Words
                         </th>
                         <th className="text-right py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800">
                           Est. Hours
@@ -881,14 +881,14 @@ function WorkloadContent() {
                                     type="text"
                                     inputMode="numeric"
                                     pattern="[0-9]*"
-                                    value={editWordsPerHour}
+                                    value={editLinesPerHour}
                                     onChange={(e) =>
-                                      handleEditWordsPerHourChange(e.target.value)
+                                      handleEditLinesPerHourChange(e.target.value)
                                     }
                                     onKeyDown={(e) =>
                                       handleRateInputKeyDown(e, workload.userId)
                                     }
-                                    ref={wordsPerHourInputRef}
+                                    ref={linesPerHourInputRef}
                                     className="no-spinner w-20 px-2 py-1 text-sm text-center border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                                   />
                                 : <button
@@ -897,13 +897,13 @@ function WorkloadContent() {
                                         workload.userId,
                                         workload.wordsPerHour,
                                         workload.linesPerHour,
-                                        "words"
+                                        "lines"
                                       )
                                     }
                                     className="text-sm text-gray-900 dark:text-white hover:text-blue-500 dark:hover:text-blue-400 cursor-pointer"
                                     type="button"
                                   >
-                                    {workload.wordsPerHour}
+                                    {workload.linesPerHour}
                                   </button>
                                 }
                               </td>
@@ -917,14 +917,14 @@ function WorkloadContent() {
                                       type="text"
                                       inputMode="numeric"
                                       pattern="[0-9]*"
-                                      value={editLinesPerHour}
+                                      value={editWordsPerHour}
                                       onChange={(e) =>
-                                        handleEditLinesPerHourChange(e.target.value)
+                                        handleEditWordsPerHourChange(e.target.value)
                                       }
                                       onKeyDown={(e) =>
                                         handleRateInputKeyDown(e, workload.userId)
                                       }
-                                      ref={linesPerHourInputRef}
+                                      ref={wordsPerHourInputRef}
                                       className="no-spinner w-20 px-2 py-1 text-sm text-center border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                                     />
                                     <button
@@ -951,21 +951,21 @@ function WorkloadContent() {
                                         workload.userId,
                                         workload.wordsPerHour,
                                         workload.linesPerHour,
-                                        "lines"
+                                        "words"
                                       )
                                     }
                                     className="text-sm text-gray-900 dark:text-white hover:text-blue-500 dark:hover:text-blue-400 cursor-pointer"
                                     type="button"
                                   >
-                                    {workload.linesPerHour}
+                                    {workload.wordsPerHour}
                                   </button>
                                 }
                               </td>
                               <td className="py-3 px-4 text-sm text-gray-900 dark:text-white text-right">
-                                {workload.filteredWords.toLocaleString(NUMBER_LOCALE)}
+                                {workload.filteredLines.toLocaleString(NUMBER_LOCALE)}
                               </td>
                               <td className="py-3 px-4 text-sm text-gray-900 dark:text-white text-right">
-                                {workload.filteredLines.toLocaleString(NUMBER_LOCALE)}
+                                {workload.filteredWords.toLocaleString(NUMBER_LOCALE)}
                               </td>
                               <td className="py-3 px-4 text-sm text-gray-900 dark:text-white text-right font-medium">
                                 {workload.filteredEstimatedHours}h
@@ -1018,10 +1018,10 @@ function WorkloadContent() {
                                               System
                                             </th>
                                             <th className="text-right py-2 px-3 font-medium">
-                                              Words (Share)
+                                              Lines (Share)
                                             </th>
                                             <th className="text-right py-2 px-3 font-medium">
-                                              Lines (Share)
+                                              Words (Share)
                                             </th>
                                             <th className="text-left py-2 px-3 font-medium">
                                               Translators
@@ -1062,10 +1062,10 @@ function WorkloadContent() {
                                                   {project.system}
                                                 </td>
                                                 <td className="py-2 px-3 text-gray-900 dark:text-white text-right">
-                                                  {project.wordsShare.toLocaleString(NUMBER_LOCALE)}
+                                                  {project.linesShare.toLocaleString(NUMBER_LOCALE)}
                                                 </td>
                                                 <td className="py-2 px-3 text-gray-900 dark:text-white text-right">
-                                                  {project.linesShare.toLocaleString(NUMBER_LOCALE)}
+                                                  {project.wordsShare.toLocaleString(NUMBER_LOCALE)}
                                                 </td>
                                                 <td className="py-2 px-3">
                                                   <div className="flex flex-wrap gap-2">

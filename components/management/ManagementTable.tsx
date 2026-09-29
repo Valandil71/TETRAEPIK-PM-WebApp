@@ -238,8 +238,8 @@ export function ManagementTable({
               <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300 w-4 bg-gray-50 dark:bg-gray-900" />
               <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900">System</th>
               <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900">Project Name</th>
-              <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300 text-right bg-gray-50 dark:bg-gray-900">Words</th>
               <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300 text-right bg-gray-50 dark:bg-gray-900">Lines</th>
+              <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300 text-right bg-gray-50 dark:bg-gray-900">Words</th>
               <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900">Collaborator(s)</th>
               <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900">Due Date</th>
               <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900">Instructions</th>
@@ -332,10 +332,10 @@ export function ManagementTable({
                                 type="text"
                                 inputMode="numeric"
                                 pattern="[0-9]*"
-                                value={editWords}
-                                onChange={(e) => onEditWordsChange(e.target.value)}
+                                value={editLines}
+                                onChange={(e) => onEditLinesChange(e.target.value)}
                                 onKeyDown={(e) => handleWordsLinesKeyDown(e, project.id)}
-                                ref={wordsInputRef}
+                                ref={linesInputRef}
                                 className="no-spinner w-24 px-3 py-2 text-sm text-right border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                               />
                             : <button
@@ -344,13 +344,13 @@ export function ManagementTable({
                                     project.id,
                                     project.words,
                                     project.lines,
-                                    "words"
+                                    "lines"
                                   )
                                 }
                                 className="inline-flex min-h-9 min-w-[72px] items-center justify-end rounded-md border border-gray-200 dark:border-gray-700 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer transition-colors hover:text-blue-500 dark:hover:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-800"
                                 type="button"
                               >
-                                {project.words != null ? formatNumber(project.words) : "-"}
+                                {project.lines != null ? formatNumber(project.lines) : "-"}
                               </button>
                             }
                           </div>
@@ -363,10 +363,10 @@ export function ManagementTable({
                                   type="text"
                                   inputMode="numeric"
                                   pattern="[0-9]*"
-                                  value={editLines}
-                                  onChange={(e) => onEditLinesChange(e.target.value)}
+                                  value={editWords}
+                                  onChange={(e) => onEditWordsChange(e.target.value)}
                                   onKeyDown={(e) => handleWordsLinesKeyDown(e, project.id)}
-                                  ref={linesInputRef}
+                                  ref={wordsInputRef}
                                   className="no-spinner w-24 px-3 py-2 text-sm text-right border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                                 />
                                 <button
@@ -391,13 +391,13 @@ export function ManagementTable({
                                     project.id,
                                     project.words,
                                     project.lines,
-                                    "lines"
+                                    "words"
                                   )
                                 }
                                 className="inline-flex min-h-9 min-w-[72px] items-center justify-end rounded-md border border-gray-200 dark:border-gray-700 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer transition-colors hover:text-blue-500 dark:hover:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-800"
                                 type="button"
                               >
-                                {project.lines != null ? formatNumber(project.lines) : "-"}
+                                {project.words != null ? formatNumber(project.words) : "-"}
                               </button>
                             }
                           </div>
