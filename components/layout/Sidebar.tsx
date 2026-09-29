@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState, useMemo } from "react";
+import { Fragment, useEffect, useState, useMemo } from "react";
 import {
   Home,
   FolderKanban,
@@ -27,7 +27,11 @@ interface NavItemConfig {
   icon: LucideIcon;
   label: string;
   allowedRoles: UserRole[];
+  section: string;
 }
+
+// Sidebar sections, in display order
+const sectionOrder = ["Overview", "My Work", "Management", "Archive"];
 
 // All navigation items with role restrictions
 const allNavItems: NavItemConfig[] = [
@@ -36,12 +40,14 @@ const allNavItems: NavItemConfig[] = [
     icon: Home,
     label: "Home",
     allowedRoles: ["employee", "pm", "admin"],
+    section: "Overview",
   },
   {
     path: "/my-projects",
     icon: ClipboardList,
     label: "My Projects",
     allowedRoles: ["employee", "pm", "admin"],
+    section: "My Work",
   },
   // "Assign Projects" hidden from navigation: page kept as the base for a future bulk assignment (still reachable by direct URL).
   // {
@@ -55,24 +61,28 @@ const allNavItems: NavItemConfig[] = [
     icon: FolderKanban,
     label: "Manage Projects",
     allowedRoles: ["pm", "admin"],
-  },
-  {
-    path: "/concluded-projects",
-    icon: CheckCircle,
-    label: "Concluded Projects",
-    allowedRoles: ["pm", "admin"],
-  },
-  {
-    path: "/invoicing",
-    icon: Receipt,
-    label: "Invoicing",
-    allowedRoles: ["admin"],
+    section: "Management",
   },
   {
     path: "/workload",
     icon: BarChart3,
     label: "Workload",
     allowedRoles: ["pm", "admin"],
+    section: "Management",
+  },
+  {
+    path: "/invoicing",
+    icon: Receipt,
+    label: "Invoicing",
+    allowedRoles: ["admin"],
+    section: "Management",
+  },
+  {
+    path: "/concluded-projects",
+    icon: CheckCircle,
+    label: "Concluded Projects",
+    allowedRoles: ["pm", "admin"],
+    section: "Archive",
   },
 ];
 
@@ -82,11 +92,15 @@ export function Sidebar() {
   const { user, loading: userLoading, role } = useRoleAccess();
 
   const roleLabel =
-    role === "admin" ? "Administrator"
-    : role === "pm" ? "Project Manager"
-    : role === "employee" ? "Collaborator"
-    : role ? "Account"
-    : "Account";
+    role === "admin"
+      ? "Administrator"
+      : role === "pm"
+        ? "Project Manager"
+        : role === "employee"
+          ? "Collaborator"
+          : role
+            ? "Account"
+            : "Account";
 
   // Filter nav items based on user role
   const navItems = useMemo(() => {
@@ -130,13 +144,15 @@ export function Sidebar() {
     >
       <div className="flex flex-col h-full">
         {/* Header */}
-        <div className="flex items-center justify-between h-16 px-6 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex items-center justify-between h-16 shrink-0 px-6 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-2">
             {showLabels && (
               <span className="text-gray-900 dark:text-white font-medium">
-                {shouldAnimate ?
+                {shouldAnimate ? (
                   <TypewriterText text="TETRAEPIK" speed={30} delay={0} />
-                : "TETRAEPIK"}
+                ) : (
+                  "TETRAEPIK"
+                )}
               </span>
             )}
           </div>
@@ -145,58 +161,85 @@ export function Sidebar() {
             className="p-2 cursor-pointer rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 transition-colors"
             type="button"
           >
-            {collapsed ?
+            {collapsed ? (
               <ChevronRight className="w-5 h-5" />
-            : <ChevronLeft className="w-5 h-5" />}
+            ) : (
+              <ChevronLeft className="w-5 h-5" />
+            )}
           </button>
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 px-3 py-6 space-y-1">
-          {navItems.map((item, index) => {
-            const isActive = pathname === item.path;
-            const Icon = item.icon;
+        <nav className="flex-1 min-h-0 overflow-y-auto flex flex-col px-3 py-6">
+          {sectionOrder.map((section, sectionIndex) => {
+            const items = navItems.filter((item) => item.section === section);
+            if (items.length === 0) return null;
 
             return (
-              <Link
-                key={item.path}
-                href={item.path}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
-                  isActive ?
-                    "bg-blue-500 text-white shadow-sm"
-                  : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
-                }`}
-                title={collapsed ? item.label : undefined}
-              >
-                <Icon className="w-5 h-5 shrink-0" />
-                {showLabels && (
-                  <span>
-                    {shouldAnimate ?
-                      <TypewriterText
-                        text={item.label}
-                        speed={30}
-                        delay={50 + index * 40}
-                      />
-                    : item.label}
-                  </span>
+              <Fragment key={section}>
+                {/* Gap between sections: fixed minimum, grows on taller screens up to a cap */}
+                {sectionIndex > 0 && (
+                  <div className="flex-1 min-h-5 max-h-12 shrink" aria-hidden />
                 )}
-              </Link>
+                <div className="space-y-1">
+                  {showLabels ? (
+                    <p className="px-3 pb-1 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                      {section}
+                    </p>
+                  ) : (
+                    <div className="mx-3 border-t border-gray-200 dark:border-gray-700" />
+                  )}
+                  {items.map((item) => {
+                    const index = navItems.indexOf(item);
+                    const isActive = pathname === item.path;
+                    const Icon = item.icon;
+
+                    return (
+                      <Link
+                        key={item.path}
+                        href={item.path}
+                        className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
+                          isActive
+                            ? "bg-blue-500 text-white shadow-sm"
+                            : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+                        }`}
+                        title={collapsed ? item.label : undefined}
+                      >
+                        <Icon className="w-5 h-5 shrink-0" />
+                        {showLabels && (
+                          <span>
+                            {shouldAnimate ? (
+                              <TypewriterText
+                                text={item.label}
+                                speed={30}
+                                delay={50 + index * 40}
+                              />
+                            ) : (
+                              item.label
+                            )}
+                          </span>
+                        )}
+                      </Link>
+                    );
+                  })}
+                </div>
+              </Fragment>
             );
           })}
         </nav>
 
         {/* Profile Section */}
-        <div className="px-3 pb-4 border-t border-gray-200 dark:border-gray-700 pt-4">
+        <div className="shrink-0 px-3 pb-4 border-t border-gray-200 dark:border-gray-700 pt-4">
           <Link
             href="/profile"
             className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
-              pathname === "/profile" ?
-                "bg-blue-500 text-white shadow-sm"
-              : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+              pathname === "/profile"
+                ? "bg-blue-500 text-white shadow-sm"
+                : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
             }`}
             title={collapsed ? "Profile" : undefined}
           >
-            {userLoading ?
+            {userLoading ? (
               <>
                 {/* Avatar skeleton */}
                 <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 animate-pulse shrink-0" />
@@ -209,7 +252,8 @@ export function Sidebar() {
                   </div>
                 )}
               </>
-            : <>
+            ) : (
+              <>
                 <ProfileAvatar
                   name={user?.name || ""}
                   avatar={user?.avatar}
@@ -219,47 +263,53 @@ export function Sidebar() {
                 {showLabels && (
                   <div className="flex-1 min-w-0">
                     <p className="text-sm truncate">
-                      {shouldAnimate && user?.name ?
+                      {shouldAnimate && user?.name ? (
                         <TypewriterText
                           text={user.name}
                           speed={30}
                           delay={250}
                         />
-                      : user?.name || "Profile"}
+                      ) : (
+                        user?.name || "Profile"
+                      )}
                     </p>
                     <p className="text-xs opacity-70 truncate">
-                      {shouldAnimate ?
+                      {shouldAnimate ? (
                         <TypewriterText
                           text={roleLabel}
                           speed={30}
                           delay={300}
                         />
-                      : roleLabel}
+                      ) : (
+                        roleLabel
+                      )}
                     </p>
                   </div>
                 )}
               </>
-            }
+            )}
           </Link>
         </div>
 
         {/* Settings */}
-        <div className="px-3 pb-4 border-t border-gray-200 dark:border-gray-700 pt-4">
+        <div className="shrink-0 px-3 pb-4 border-t border-gray-200 dark:border-gray-700 pt-4">
           <Link
             href="/settings"
             className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
-              pathname === "/settings" ?
-                "bg-blue-500 text-white shadow-sm"
-              : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+              pathname === "/settings"
+                ? "bg-blue-500 text-white shadow-sm"
+                : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
             }`}
             title={collapsed ? "Settings" : undefined}
           >
             <Settings className="w-5 h-5 shrink-0" />
             {showLabels && (
               <span>
-                {shouldAnimate ?
+                {shouldAnimate ? (
                   <TypewriterText text="Settings" speed={30} delay={350} />
-                : "Settings"}
+                ) : (
+                  "Settings"
+                )}
               </span>
             )}
           </Link>
