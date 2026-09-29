@@ -20,6 +20,7 @@ import {
 import { useUser } from "@/hooks/user/useUser";
 import { useProjectsWithTranslators } from "@/hooks/project/useProjectsWithTranslators";
 import { useUserWorkload } from "@/hooks/user/useUserWorkload";
+import { DueDateModal } from "@/components/general/DueDateModal";
 import { RoleGuard } from "@/components/auth/RoleGuard";
 import { RouteId } from "@/lib/roleAccess";
 import { Card, CardContent } from "@/components/ui/card";
@@ -86,6 +87,11 @@ function WorkloadContent() {
   // State for By User tab
   const [userDatePreset, setUserDatePreset] = useState<DatePreset>("month");
   const [userCustomDate, setUserCustomDate] = useState<string>("");
+
+  // Which tab's custom-date modal is open (chosen date is applied on confirm)
+  const [customModal, setCustomModal] = useState<"byDate" | "byUser" | null>(
+    null
+  );
   const [expandedUsers, setExpandedUsers] = useState<Set<string>>(new Set());
 
   // State for editing user rates
@@ -514,7 +520,11 @@ function WorkloadContent() {
               {datePresets.map((preset) => (
                 <button
                   key={preset.id}
-                  onClick={() => setSelectedPreset(preset.id)}
+                  onClick={() =>
+                    preset.id === "custom" ?
+                      setCustomModal("byDate")
+                    : setSelectedPreset(preset.id)
+                  }
                   className={`px-4 py-2 rounded-lg border text-sm transition-all ${
                     selectedPreset === preset.id ?
                       "border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
@@ -525,15 +535,6 @@ function WorkloadContent() {
                   {preset.label}
                 </button>
               ))}
-
-              {selectedPreset === "custom" && (
-                <input
-                  type="date"
-                  value={customDate}
-                  onChange={(e) => setCustomDate(e.target.value)}
-                  className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              )}
             </div>
 
             {targetDate && (
@@ -764,7 +765,11 @@ function WorkloadContent() {
               {datePresets.map((preset) => (
                 <button
                   key={preset.id}
-                  onClick={() => setUserDatePreset(preset.id)}
+                  onClick={() =>
+                    preset.id === "custom" ?
+                      setCustomModal("byUser")
+                    : setUserDatePreset(preset.id)
+                  }
                   className={`px-4 py-2 rounded-lg border text-sm transition-all ${
                     userDatePreset === preset.id ?
                       "border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
@@ -775,15 +780,6 @@ function WorkloadContent() {
                   {preset.label}
                 </button>
               ))}
-
-              {userDatePreset === "custom" && (
-                <input
-                  type="date"
-                  value={userCustomDate}
-                  onChange={(e) => setUserCustomDate(e.target.value)}
-                  className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              )}
             </div>
 
             {userTargetDate && (
@@ -1144,6 +1140,24 @@ function WorkloadContent() {
           }
         </>
       )}
+
+      <DueDateModal
+        open={customModal !== null}
+        onOpenChange={(open) => {
+          if (!open) setCustomModal(null);
+        }}
+        value={customModal === "byUser" ? userCustomDate : customDate}
+        onConfirm={(date) => {
+          if (customModal === "byUser") {
+            setUserCustomDate(date);
+            setUserDatePreset("custom");
+          } else {
+            setCustomDate(date);
+            setSelectedPreset("custom");
+          }
+          setCustomModal(null);
+        }}
+      />
     </div>
   );
 }

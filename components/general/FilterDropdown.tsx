@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { ChevronDown, Check, Calendar, X } from "lucide-react";
+import { ChevronDown, Check, X } from "lucide-react";
+import { DueDateModal } from "@/components/general/DueDateModal";
 
 interface FilterDropdownProps {
   label: string;
@@ -26,7 +27,7 @@ export function FilterDropdown({
   customDateMax,
 }: FilterDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [dateModalOpen, setDateModalOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -36,7 +37,6 @@ export function FilterDropdown({
         !dropdownRef.current.contains(event.target as Node)
       ) {
         setIsOpen(false);
-        setShowDatePicker(false);
       }
     }
 
@@ -46,11 +46,11 @@ export function FilterDropdown({
 
   const handleOptionClick = (option: string) => {
     if (option === "Custom date") {
-      setShowDatePicker(true);
+      setIsOpen(false);
+      setDateModalOpen(true);
     } else {
       onSelect(option);
       setIsOpen(false);
-      setShowDatePicker(false);
     }
   };
 
@@ -67,7 +67,6 @@ export function FilterDropdown({
   const handleClearFilter = (e: React.MouseEvent) => {
     e.stopPropagation();
     onSelect(null);
-    setShowDatePicker(false);
   };
 
   return (
@@ -101,7 +100,6 @@ export function FilterDropdown({
             onClick={() => {
               onSelect(null);
               setIsOpen(false);
-              setShowDatePicker(false);
             }}
             className="w-full px-4 py-2.5 cursor-pointer text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors flex items-center justify-between"
             type="button"
@@ -122,51 +120,22 @@ export function FilterDropdown({
               )}
             </button>
           ))}
-
-          {/* Custom Date Picker */}
-          {showDatePicker && (
-            <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-700 mt-1">
-              <div className="flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-gray-400" />
-                <span className="text-xs text-gray-600 dark:text-gray-400">
-                  Until:
-                </span>
-              </div>
-              <input
-                type="date"
-                aria-label={`Custom ${label.toLowerCase()}`}
-                value={effectiveDate || ""}
-                min={customDateMin}
-                max={customDateMax}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  if (
-                    (customDateMax && v > customDateMax) ||
-                    (customDateMin && v && v < customDateMin)
-                  ) {
-                    return;
-                  }
-                  if (onCustomDateChange) {
-                    onCustomDateChange(e.target.value);
-                    onSelect("Custom date");
-                  }
-                }}
-                onClick={(e) => e.stopPropagation()}
-                className="w-full mt-2 px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <button
-                onClick={() => {
-                  setShowDatePicker(false);
-                  onSelect(null);
-                }}
-                className="absolute top-2 right-2 cursor-pointer text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400 transition-colors"
-                type="button"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          )}
         </div>
+      )}
+
+      {onCustomDateChange && (
+        <DueDateModal
+          open={dateModalOpen}
+          onOpenChange={setDateModalOpen}
+          value={effectiveDate}
+          min={customDateMin}
+          max={customDateMax}
+          onConfirm={(date) => {
+            onCustomDateChange(date);
+            onSelect("Custom date");
+            setDateModalOpen(false);
+          }}
+        />
       )}
     </div>
   );
