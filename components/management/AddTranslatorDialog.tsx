@@ -24,6 +24,12 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
+/** Test accounts that should never be offered for project assignment */
+const HIDDEN_USER_NAMES = ["Francisco Rodrigues", "Xiconi das Coves"];
+
+/** Display order of roles in the selection grid */
+const ROLE_ORDER = ["employee", "pm", "admin"];
+
 interface AddTranslatorDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -77,9 +83,37 @@ export function AddTranslatorDialog({
     return false;
   }, [assignedTranslatorIds, liveAssignedTranslatorIds]);
 
-  // Filter out already assigned translators
-  const availableUsers =
-    users?.filter((user) => !assignedTranslatorIds.includes(user.id)) || [];
+  // Filter out already assigned translators and test accounts, then sort by
+  // role (Collaborators, PMs, Admins) and, within each role, lowest workload first
+  const availableUsers = useMemo(() => {
+    const normalize = (name: string) =>
+      name
+        .normalize("NFD")
+        .replace(/[̀-ͯ]/g, "")
+        .trim()
+        .toLowerCase();
+    const hiddenNames = new Set(
+      HIDDEN_USER_NAMES.map((name) => normalize(name))
+    );
+    const roleOrder = (role: string) => {
+      const index = ROLE_ORDER.indexOf(role);
+      return index === -1 ? ROLE_ORDER.length : index;
+    };
+    const hours = (id: string) => workloads.get(id)?.estimatedHours ?? 0;
+
+    return (users || [])
+      .filter(
+        (user) =>
+          !assignedTranslatorIds.includes(user.id) &&
+          !hiddenNames.has(normalize(user.name))
+      )
+      .sort(
+        (a, b) =>
+          roleOrder(a.role) - roleOrder(b.role) ||
+          hours(a.id) - hours(b.id) ||
+          a.name.localeCompare(b.name)
+      );
+  }, [users, assignedTranslatorIds, workloads]);
 
   const handleTranslatorToggle = (userId: string) => {
     const newSelection = new Set(selectedTranslators);
@@ -117,7 +151,7 @@ export function AddTranslatorDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-5xl max-h-[90vh] flex flex-col p-0 gap-0">
+      <DialogContent className="sm:max-w-6xl max-h-[90vh] flex flex-col p-0 gap-0">
         {/* Show stale data warning if assignments changed */}
         {isDataStale ?
           <div className="flex flex-col items-center justify-center py-16 px-6">
@@ -152,14 +186,17 @@ export function AddTranslatorDialog({
               <div className="text-center py-8 text-gray-500 dark:text-gray-400">
                 All available collaborators are already assigned to this project.
               </div>
-            : <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-6">
+            : <TooltipProvider delayDuration={200}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 items-start gap-3 pb-6">
             {availableUsers.map((user: User) => {
               const isSelected = selectedTranslators.has(user.id);
               const userWorkload = workloads.get(user.id);
+              const fullName =
+                user.short_name ? `${user.name} (${user.short_name})` : user.name;
               return (
                 <div
                   key={user.id}
-                  className={`p-4 bg-white dark:bg-gray-800 rounded-xl border transition-all duration-200 cursor-pointer ${
+                  className={`min-w-0 p-3 bg-white dark:bg-gray-800 rounded-lg border transition-all duration-200 cursor-pointer ${
                     isSelected ?
                       "border-blue-500 shadow-lg"
                     : "border-gray-200 dark:border-gray-700 hover:shadow-md"
@@ -183,32 +220,39 @@ export function AddTranslatorDialog({
                     handleTranslatorToggle(user.id);
                   }}
                 >
-                  <div className="flex items-start gap-3 mb-3">
+                  <div className="relative flex flex-col items-center gap-1.5 text-center">
                     <input
                       type="checkbox"
                       checked={isSelected}
                       onChange={() => handleTranslatorToggle(user.id)}
-                      className="outline-style w-5 h-5 mt-1 rounded cursor-pointer"
+                      className="outline-style absolute top-0 left-0 w-5 h-5 rounded cursor-pointer"
                     />
-                    <div className="flex flex-col items-center text-center flex-1">
-                      <div className="mb-2">
-                        <ProfileAvatar
-                          name={user.name}
-                          avatar={user.avatar}
-                          size="sm"
-                          showEditButton={false}
-                        />
-                      </div>
-                      <h3 className="text-gray-900 dark:text-white text-sm">
-                        {user.name}
-                        {user.short_name && (
-                          <span className="text-gray-500 dark:text-gray-400 font-normal">
-                            {" "}
-                            ({user.short_name})
-                          </span>
-                        )}
-                      </h3>
-                      <p className="text-gray-500 dark:text-gray-400 text-xs">
+                    <div className="shrink-0">
+                      <ProfileAvatar
+                        name={user.name}
+                        avatar={user.avatar}
+                        size="md"
+                        showEditButton={false}
+                      />
+                    </div>
+                    <div className="min-w-0 w-full">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <h3 className="truncate text-gray-900 dark:text-white text-sm">
+                            {user.name}
+                            {user.short_name && (
+                              <span className="text-gray-500 dark:text-gray-400 font-normal">
+                                {" "}
+                                ({user.short_name})
+                              </span>
+                            )}
+                          </h3>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>{fullName}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                      <p className="truncate text-gray-500 dark:text-gray-400 text-xs">
                         {formatRoleDisplay(user.role)}
                       </p>
                     </div>
@@ -218,59 +262,57 @@ export function AddTranslatorDialog({
                   {userWorkload &&
                     (userWorkload.totalWords > 0 ||
                       userWorkload.totalLines > 0) && (
-                      <div className="mb-3 pt-3 border-t border-gray-100 dark:border-gray-700/50 space-y-1.5">
+                      <div className="mt-2.5 pt-2.5 border-t border-gray-100 dark:border-gray-700/50 space-y-1">
                         {/* Next Week Workload */}
                         <span className="text-xs text-gray-500 dark:text-gray-400">
                           Predicted workload:
                         </span>
-                        <div className="flex items-center justify-between text-xs">
-                          <div className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400">
-                            <Clock className="w-3 h-3" />
-                            <span className="font-medium">
+                        <div className="flex items-center justify-between gap-2 text-xs">
+                          <div className="flex items-center gap-1.5 min-w-0 text-blue-600 dark:text-blue-400">
+                            <Clock className="w-3 h-3 shrink-0" />
+                            <span className="font-medium truncate">
                               Next week: {userWorkload.nextWeekEstimatedHours}h
                             </span>
                           </div>
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              {userWorkload.nextWeekIsFeasible ?
+                                <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-green-500" />
+                              : <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-amber-500" />
+                              }
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>
                                 {userWorkload.nextWeekIsFeasible ?
-                                  <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
-                                : <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
-                                }
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p>
-                                  {userWorkload.nextWeekIsFeasible ?
-                                    "Should be able to handle workload"
-                                  : "Workload may be challenging"}
-                                </p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
+                                  "Should be able to handle workload"
+                                : "Workload may be challenging"}
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
                         </div>
                         {/* Total Workload */}
-                        <div className="flex items-center justify-between text-xs">
-                          <div className="flex items-center gap-1.5 text-gray-600 dark:text-gray-400">
-                            <Clock className="w-3 h-3" />
-                            <span>Total: {userWorkload.estimatedHours}h</span>
+                        <div className="flex items-center justify-between gap-2 text-xs">
+                          <div className="flex items-center gap-1.5 min-w-0 text-gray-600 dark:text-gray-400">
+                            <Clock className="w-3 h-3 shrink-0" />
+                            <span className="truncate">
+                              Total: {userWorkload.estimatedHours}h
+                            </span>
                           </div>
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              {userWorkload.isFeasible ?
+                                <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-green-500" />
+                              : <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-amber-500" />
+                              }
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>
                                 {userWorkload.isFeasible ?
-                                  <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
-                                : <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
-                                }
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p>
-                                  {userWorkload.isFeasible ?
-                                    "Appears to have availability"
-                                  : "Workload appears high"}
-                                </p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
+                                  "Appears to have availability"
+                                : "Workload appears high"}
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
                         </div>
                       </div>
                     )}
@@ -279,16 +321,16 @@ export function AddTranslatorDialog({
                   {userWorkload &&
                     userWorkload.totalWords === 0 &&
                     userWorkload.totalLines === 0 && (
-                      <div className="mb-3 pt-3 border-t border-gray-100 dark:border-gray-700/50">
+                      <div className="mt-2.5 pt-2.5 border-t border-gray-100 dark:border-gray-700/50">
                         <div className="flex items-center gap-1.5 text-xs text-green-600 dark:text-green-400">
-                          <CheckCircle2 className="w-3 h-3" />
-                          <span>Available - no current projects</span>
+                          <CheckCircle2 className="w-3 h-3 shrink-0" />
+                          <span className="truncate">Available - no current projects</span>
                         </div>
                       </div>
                     )}
 
                   {isSelected && (
-                    <div className="pt-3 border-t border-gray-200 dark:border-gray-700">
+                    <div className="mt-2.5 pt-2.5 border-t border-gray-200 dark:border-gray-700">
                       <label className="block text-gray-700 dark:text-gray-300 text-xs mb-0.5">
                         Custom Instruction (optional)
                       </label>
@@ -310,6 +352,7 @@ export function AddTranslatorDialog({
               );
             })}
             </div>
+            </TooltipProvider>
             }
           </div>
 
