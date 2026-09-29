@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import {
   FolderKanban,
-  UserPlus,
+  // UserPlus, // only used by the hidden "Assign Projects" card
   ClipboardList,
   ChevronDown,
   ChevronUp,
@@ -92,14 +92,15 @@ export default function HomePage() {
         count: myProjectsCount,
         allowedRoles: ["employee", "pm", "admin"],
       },
-      {
-        title: "Assign Projects",
-        icon: UserPlus,
-        path: "/assign-projects",
-        color: "bg-purple-500",
-        description: "Distribute work to collaborators",
-        allowedRoles: ["pm", "admin"],
-      },
+      // "Assign Projects" card hidden: page kept as the base for a future bulk assignment (still reachable by direct URL).
+      // {
+      //   title: "Assign Projects",
+      //   icon: UserPlus,
+      //   path: "/assign-projects",
+      //   color: "bg-purple-500",
+      //   description: "Distribute work to collaborators",
+      //   allowedRoles: ["pm", "admin"],
+      // },
     ],
     [myProjectsCount, manageProjectsCount]
   );

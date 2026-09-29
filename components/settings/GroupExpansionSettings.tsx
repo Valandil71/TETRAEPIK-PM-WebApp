@@ -43,7 +43,7 @@ export function GroupExpansionSettings() {
           <Rows3 className="w-6 h-6" /> Group Expansion
         </h2>
         <p className="text-sm text-muted-foreground mt-1">
-          Choose how grouped lists open for your account in Management, Assign Projects, and Invoicing.
+          Choose how grouped lists open for your account in Management and Invoicing.
         </p>
       </div>
 

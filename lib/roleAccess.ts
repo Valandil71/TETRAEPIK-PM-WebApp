@@ -53,12 +53,13 @@ export const navItems: NavItem[] = [
     routeId: RouteId.MY_PROJECTS,
     allowedRoles: ["employee", "pm", "admin"],
   },
-  {
-    path: "/assign-projects",
-    label: "Assign Projects",
-    routeId: RouteId.ASSIGN_PROJECTS,
-    allowedRoles: ["pm", "admin"],
-  },
+  // "Assign Projects" hidden from navigation: page kept as the base for a future bulk assignment (still reachable by direct URL).
+  // {
+  //   path: "/assign-projects",
+  //   label: "Assign Projects",
+  //   routeId: RouteId.ASSIGN_PROJECTS,
+  //   allowedRoles: ["pm", "admin"],
+  // },
   {
     path: "/management",
     label: "Manage Projects",
