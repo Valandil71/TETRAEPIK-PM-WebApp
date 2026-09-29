@@ -4,6 +4,7 @@ import {
   MoreVertical,
   CheckCircle,
   UserPlus,
+  UserCheck,
   UserMinus,
   FilePlus,
   Loader2,
@@ -23,6 +24,7 @@ interface ProjectActionsMenuProps {
   isOpen: boolean;
   onToggle: () => void;
   onAddTranslator: () => void;
+  onSelfAssign: () => void;
   onRemoveTranslator: () => void;
   onCreateStmProject: () => void;
   isCreatingStmProject?: boolean;
@@ -35,6 +37,7 @@ export function ProjectActionsMenu({
   isOpen,
   onToggle,
   onAddTranslator,
+  onSelfAssign,
   onRemoveTranslator,
   onCreateStmProject,
   isCreatingStmProject = false,
@@ -88,6 +91,16 @@ export function ProjectActionsMenu({
         >
           <UserPlus className="w-4 h-4 mr-2" />
           Add translator
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          className="cursor-pointer px-4 py-2.5 text-gray-700 dark:text-gray-300 hover:bg-blue-100 dark:hover:bg-gray-700 focus:bg-blue-100 dark:focus:bg-gray-700"
+          onClick={(e) => {
+            e.stopPropagation();
+            onSelfAssign();
+          }}
+        >
+          <UserCheck className="w-4 h-4 mr-2" />
+          Self-Assign
         </DropdownMenuItem>
         <DropdownMenuItem
           className="cursor-pointer px-4 py-2.5 text-gray-700 dark:text-gray-300 hover:bg-red-100 dark:hover:bg-gray-700 hover:text-red-700 dark:hover:text-red-400 focus:bg-red-100 dark:focus:bg-gray-700 focus:text-red-700 dark:focus:text-red-400"

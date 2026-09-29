@@ -112,6 +112,7 @@ interface ManagementCardProps {
   openMenu: string | null;
   onMenuToggle: (projectId: string | null) => void;
   onAddTranslator: (projectId: number) => void;
+  onSelfAssign: (projectId: number) => void;
   onRemoveTranslator: (projectId: number) => void;
   onCreateStmProject: (projectId: number) => void;
   creatingStmProjectId: number | null;
@@ -138,6 +139,7 @@ export function ManagementCard({
   openMenu,
   onMenuToggle,
   onAddTranslator,
+  onSelfAssign,
   onRemoveTranslator,
   onCreateStmProject,
   creatingStmProjectId,
@@ -251,6 +253,7 @@ export function ManagementCard({
             )
           }
           onAddTranslator={() => onAddTranslator(project.id)}
+          onSelfAssign={() => onSelfAssign(project.id)}
           onRemoveTranslator={() => onRemoveTranslator(project.id)}
           onCreateStmProject={() => onCreateStmProject(project.id)}
           isCreatingStmProject={

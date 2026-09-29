@@ -452,6 +452,29 @@ function ProjectManagementContent() {
       toast.error(getUserFriendlyError(error, "project management")),
   });
 
+  const selfAssignMutation = useMutation({
+    mutationFn: async ({ projectId, userId }: { projectId: number; userId: string }) => {
+      const { error } = await supabase.from("projects_assignment").insert({
+        project_id: projectId,
+        user_id: userId,
+        assignment_status: "claimed",
+        initial_message: null,
+      });
+      if (error) throw new Error(`Failed to self-assign: ${error.message}`);
+    },
+    onSuccess: (_, { projectId, userId }) => {
+      queryClient.invalidateQueries({ queryKey: ["projects-with-translators"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.project(projectId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.myProjects(userId) });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.homeMyProjectsCount(userId),
+      });
+      toast.success("Project assigned to you");
+    },
+    onError: (error: Error) =>
+      toast.error(getUserFriendlyError(error, "project management")),
+  });
+
   const removeTranslatorMutation = useMutation({
     mutationFn: async ({
       projectId,
@@ -724,6 +747,17 @@ function ProjectManagementContent() {
     }
   };
 
+  const handleSelfAssign = (projectId: number) => {
+    setOpenMenu(null);
+    if (!user) return;
+    const project = allProjects.find((p) => p.id === projectId);
+    if (project?.translators.some((t) => t.id === user.id)) {
+      toast.info("You are already assigned to this project");
+      return;
+    }
+    selfAssignMutation.mutate({ projectId, userId: user.id });
+  };
+
   const handleRemoveTranslator = (projectId: number) => {
     const project = allProjects.find((p) => p.id === projectId);
     if (project) {
@@ -970,6 +1004,7 @@ function ProjectManagementContent() {
           openMenu={openMenu}
           onMenuToggle={setOpenMenu}
           onAddTranslator={handleAddTranslator}
+          onSelfAssign={handleSelfAssign}
           onRemoveTranslator={handleRemoveTranslator}
           onCreateStmProject={handleCreateStmProject}
           creatingStmProjectId={creatingStmProjectId}
@@ -997,6 +1032,7 @@ function ProjectManagementContent() {
           openMenu={openMenu}
           onMenuToggle={setOpenMenu}
           onAddTranslator={handleAddTranslator}
+          onSelfAssign={handleSelfAssign}
           onRemoveTranslator={handleRemoveTranslator}
           onCreateStmProject={handleCreateStmProject}
           creatingStmProjectId={creatingStmProjectId}
