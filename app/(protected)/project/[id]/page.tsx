@@ -25,6 +25,7 @@ import { queryKeys } from "@/lib/queryKeys";
 import { createBrowserClient } from "@supabase/ssr";
 import { toast } from "sonner";
 import { getUserFriendlyError } from "@/utils/toastHelpers";
+import { toStmImportKey } from "@/lib/sap/import-keys";
 
 export default function ProjectPage() {
   const params = useParams();
@@ -313,6 +314,7 @@ export default function ProjectPage() {
         .insert({
           ...projectData,
           system: "STM",
+          sap_import_key: toStmImportKey(projectData.sap_import_key),
         })
         .select("id")
         .single();

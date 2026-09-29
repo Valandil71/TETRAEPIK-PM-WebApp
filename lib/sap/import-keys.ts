@@ -23,6 +23,19 @@ export function getDeadlineVariantFromImportKey(
   return null;
 }
 
+/**
+ * Import key for a manually created STM copy of an SAP project.
+ * The SAP import never generates this key, so it can't match or overwrite the copy,
+ * and the copy doesn't collide with the source on the unique (subproject, key) index.
+ */
+export function toStmImportKey(importKey: string | null | undefined): string | null {
+  if (!importKey) return null;
+  if (importKey.startsWith('STM|')) return importKey;
+  if (importKey.startsWith('STD|')) return `STM|${importKey.slice(4)}`;
+
+  return `STM|${importKey}`;
+}
+
 export function stripDeadlineVariantFromImportKey(importKey: string): string {
   const variant = getDeadlineVariantFromImportKey(importKey);
   if (!variant) return importKey;

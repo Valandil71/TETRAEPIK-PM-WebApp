@@ -39,6 +39,7 @@ import { useManagementPageStore } from "@/lib/stores/useManagementPageStore";
 import { useLayoutStore } from "@/lib/stores/useLayoutStore";
 import type { SapInstructionEntry } from "@/types/project";
 import { groupProjectsForDisplay } from "@/lib/projectGrouping";
+import { toStmImportKey } from "@/lib/sap/import-keys";
 import { useProjectGroupExpansion } from "@/hooks/project/useProjectGroupExpansion";
 import { useProjectListPagination } from "@/hooks/project/useProjectListPagination";
 import { useWindowScrollMemory } from "@/hooks/ui/useWindowScrollMemory";
@@ -629,6 +630,7 @@ function ProjectManagementContent() {
         .insert({
           ...projectData,
           system: "STM",
+          sap_import_key: toStmImportKey(projectData.sap_import_key),
         })
         .select("id")
         .single();
