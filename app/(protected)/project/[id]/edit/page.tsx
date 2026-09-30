@@ -169,6 +169,26 @@ function EditProjectContent() {
   const [conflicts, setConflicts] = useState<FieldConflict[]>([]);
   const [showConflictModal, setShowConflictModal] = useState(false);
   const hasStoredOriginal = useRef(false);
+  // Collaborators added/removed from this page since the baseline was taken: when the
+  // refetch brings them in, they must not be reported as another user's change.
+  const ownTranslatorChanges = useRef({ added: new Set<string>(), removed: new Set<string>() });
+  // Recorded before the request (a realtime refetch can arrive before the response) and
+  // restored if the request fails.
+  const recordOwnTranslatorChange = (added: string[], removed: string[]) => {
+    const previous = {
+      added: new Set(ownTranslatorChanges.current.added),
+      removed: new Set(ownTranslatorChanges.current.removed),
+    };
+    added.forEach((id) => {
+      ownTranslatorChanges.current.added.add(id);
+      ownTranslatorChanges.current.removed.delete(id);
+    });
+    removed.forEach((id) => {
+      ownTranslatorChanges.current.removed.add(id);
+      ownTranslatorChanges.current.added.delete(id);
+    });
+    return { previousOwnTranslatorChanges: previous };
+  };
 
   // Include project's current system in the list if it's not already there
   const SYSTEMS =
@@ -293,11 +313,13 @@ function EditProjectContent() {
     }
 
     // Check translator assignments
-    const originalTranslatorIds = new Set(originalProject.translators?.map((t) => t.id) || []);
+    const expectedTranslatorIds = new Set(originalProject.translators?.map((t) => t.id) || []);
+    ownTranslatorChanges.current.added.forEach((id) => expectedTranslatorIds.add(id));
+    ownTranslatorChanges.current.removed.forEach((id) => expectedTranslatorIds.delete(id));
     const currentTranslatorIds = new Set(project.translators?.map((t) => t.id) || []);
 
-    const addedTranslators = project.translators?.filter((t) => !originalTranslatorIds.has(t.id)) || [];
-    const removedTranslators = originalProject.translators?.filter((t) => !currentTranslatorIds.has(t.id)) || [];
+    const addedTranslators = [...currentTranslatorIds].filter((id) => !expectedTranslatorIds.has(id));
+    const removedTranslators = [...expectedTranslatorIds].filter((id) => !currentTranslatorIds.has(id));
 
     if (addedTranslators.length > 0 || removedTranslators.length > 0) {
       const originalNames = originalProject.translators?.map((t) => t.name).join(", ") || "None";
@@ -420,6 +442,7 @@ function EditProjectContent() {
 
     // Update original project to current state
     setOriginalProject(project);
+    ownTranslatorChanges.current = { added: new Set(), removed: new Set() };
     setShowConflictModal(false);
     setConflicts([]);
   }, [form, project, originalProject]);
@@ -532,12 +555,10 @@ function EditProjectContent() {
         projectName: "",
         assignedTranslatorIds: [],
       });
-      // Update original project to include new translators (avoid conflict modal for our own changes)
-      if (project) {
-        setOriginalProject(project);
-      }
     },
-    onError: (error: Error) => {
+    onMutate: ({ userIds }) => recordOwnTranslatorChange(userIds, []),
+    onError: (error: Error, _, context) => {
+      if (context) ownTranslatorChanges.current = context.previousOwnTranslatorChanges;
       toast.error(getUserFriendlyError(error, "project update"));
     },
   });
@@ -568,12 +589,10 @@ function EditProjectContent() {
       queryClient.invalidateQueries({ queryKey: queryKeys.homeMyProjectsCount(userId) });
       toast.success("Collaborator removed successfully");
       setTranslatorToRemove(null);
-      // Update original project to reflect removal (avoid conflict modal for our own changes)
-      if (project) {
-        setOriginalProject(project);
-      }
     },
-    onError: (error: Error) => {
+    onMutate: ({ userId }) => recordOwnTranslatorChange([], [userId]),
+    onError: (error: Error, _, context) => {
+      if (context) ownTranslatorChanges.current = context.previousOwnTranslatorChanges;
       toast.error(getUserFriendlyError(error, "project update"));
     },
   });
