@@ -25,7 +25,12 @@ import { queryKeys } from "@/lib/queryKeys";
 import { createBrowserClient } from "@supabase/ssr";
 import { toast } from "sonner";
 import { getUserFriendlyError } from "@/utils/toastHelpers";
-import { toStmImportKey } from "@/lib/sap/import-keys";
+import {
+  addCollaborators,
+  invalidateCollaboratorQueries,
+  removeCollaborator,
+} from "@/lib/projects/collaborators";
+import { createStmProject } from "@/lib/projects/stm";
 
 export default function ProjectPage() {
   const params = useParams();
@@ -138,26 +143,14 @@ export default function ProjectPage() {
       userIds: string[];
       messages: Record<string, string>;
     }) => {
-      const assignments = userIds.map((userId) => ({
-        project_id: projectId,
-        user_id: userId,
-        assignment_status: userId === user?.id ? "claimed" : "unclaimed", // Auto-claim if self-assigning
-        initial_message: messages[userId] || null,
-      }));
-
-      const { error } = await supabase
-        .from("projects_assignment")
-        .insert(assignments);
-
-      if (error) throw new Error(`Failed to add collaborators: ${error.message}`);
+      await addCollaborators(
+        supabase,
+        userIds.map((userId) => ({ projectId, userId, message: messages[userId] })),
+        user?.id
+      );
     },
-    onSuccess: (_, { userIds }) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.project(projectId) });
-      queryClient.invalidateQueries({ queryKey: ["projects-with-translators"] });
-      userIds.forEach((uid) => {
-        queryClient.invalidateQueries({ queryKey: queryKeys.myProjects(uid) });
-        queryClient.invalidateQueries({ queryKey: queryKeys.homeMyProjectsCount(uid) });
-      });
+    onSuccess: (_, { projectId, userIds }) => {
+      invalidateCollaboratorQueries(queryClient, [projectId], userIds);
       toast.success("Collaborators added successfully");
       setAddTranslatorModal({
         open: false,
@@ -180,21 +173,10 @@ export default function ProjectPage() {
       projectId: number;
       userId: string;
     }) => {
-      const { error } = await supabase
-        .from("projects_assignment")
-        .delete()
-        .eq("project_id", projectId)
-        .eq("user_id", userId);
-
-      if (error) {
-        throw new Error(`Failed to remove collaborator: ${error.message}`);
-      }
+      await removeCollaborator(supabase, projectId, userId);
     },
-    onSuccess: (_, { userId }) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.project(projectId) });
-      queryClient.invalidateQueries({ queryKey: ["projects-with-translators"] });
-      queryClient.invalidateQueries({ queryKey: queryKeys.myProjects(userId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.homeMyProjectsCount(userId) });
+    onSuccess: (_, { projectId, userId }) => {
+      invalidateCollaboratorQueries(queryClient, [projectId], [userId]);
       toast.success("Collaborator removed successfully");
     },
     onError: (error: Error) => {
@@ -303,29 +285,8 @@ export default function ProjectPage() {
 
   const createStmProjectMutation = useMutation({
     mutationFn: async () => {
-      if (!project) throw new Error("Project is required");
-
-      const { id, created_at, updated_at, translators, ...projectData } = project;
-      void id;
-      void created_at;
-      void updated_at;
-      void translators;
-
-      const { data: newProject, error } = await supabase
-        .from("projects")
-        .insert({
-          ...projectData,
-          system: "STM",
-          sap_import_key: toStmImportKey(projectData.sap_import_key),
-        })
-        .select("id")
-        .single();
-
-      if (error) {
-        throw new Error(`Failed to create STM project: ${error.message}`);
-      }
-
-      return newProject;
+      if (!projectId) throw new Error("Project ID is required");
+      return createStmProject(supabase, projectId);
     },
     onSuccess: (newProject) => {
       queryClient.invalidateQueries({ queryKey: ["projects-with-translators"] });
