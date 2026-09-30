@@ -4,7 +4,6 @@
 // Core hooks
 export { useSupabase } from './core/useSupabase';
 export { usePagination } from './core/usePagination';
-export { useConcurrencySafeMutation } from './core/useConcurrencySafeMutation';
 
 // User hooks
 export { useUser } from './user/useUser';
@@ -21,8 +20,6 @@ export { useUserWorkload } from './user/useUserWorkload';
 export { useProject } from './project/useProject';
 export { useMyProjects } from './project/useMyProjects';
 export { useProjectsWithTranslators } from './project/useProjectsWithTranslators';
-export { useUpdateProject } from './project/useUpdateProject';
-export { useUpdateAssignment } from './project/useUpdateAssignment';
 export { useProjectFilters } from './project/useProjectFilters';
 export { useProjectListPagination, PROJECT_LIST_ITEMS_PER_PAGE } from './project/useProjectListPagination';
 

@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
 
     const body = parsed.data;
 
-    const auth = await getAuthenticatedSupabase();
+    const auth = await getAuthenticatedSupabase(['pm', 'admin']);
     if ('error' in auth) return auth.error;
     supabase = auth.supabase;
     const { user } = auth;

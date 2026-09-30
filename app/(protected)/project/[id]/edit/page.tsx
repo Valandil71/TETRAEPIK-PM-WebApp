@@ -11,7 +11,6 @@ import { formatRoleDisplay } from "@/utils/formatters";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { format } from "date-fns";
 import {
   Form,
   FormControl,
@@ -40,6 +39,15 @@ import { queryKeys } from "@/lib/queryKeys";
 import { useLayoutStore } from "@/lib/stores/useLayoutStore";
 import { useManagementPageStore } from "@/lib/stores/useManagementPageStore";
 import type { ProjectWithTranslatorDetails } from "@/types/project";
+import { dateInputToTimestamp, toDateInputValue } from "@/lib/date-utils";
+import { RoleGuard } from "@/components/auth/RoleGuard";
+import { RouteId } from "@/lib/roleAccess";
+import { useRoleAccess } from "@/hooks/user/useRoleAccess";
+import {
+  addCollaborators,
+  invalidateCollaboratorQueries,
+  removeCollaborator,
+} from "@/lib/projects/collaborators";
 
 const projectSchema = z.object({
   name: z.string().min(1, "Project name is required"),
@@ -131,12 +139,21 @@ const MONITORED_FIELDS = [
 ];
 
 export default function EditProjectPage() {
+  return (
+    <RoleGuard routeId={RouteId.PROJECT_EDIT}>
+      <EditProjectContent />
+    </RoleGuard>
+  );
+}
+
+function EditProjectContent() {
   const params = useParams();
   const router = useRouter();
   const queryClient = useQueryClient();
   const projectId = params.id ? Number(params.id) : null;
 
   const { data: project, isLoading, error } = useProject(projectId);
+  const { user } = useRoleAccess();
   const collapsed = useLayoutStore((state) => state.collapsed);
   const resetManagementToStart = useManagementPageStore((state) => state.resetToStart);
 
@@ -157,6 +174,26 @@ export default function EditProjectPage() {
   const [conflicts, setConflicts] = useState<FieldConflict[]>([]);
   const [showConflictModal, setShowConflictModal] = useState(false);
   const hasStoredOriginal = useRef(false);
+  // Collaborators added/removed from this page since the baseline was taken: when the
+  // refetch brings them in, they must not be reported as another user's change.
+  const ownTranslatorChanges = useRef({ added: new Set<string>(), removed: new Set<string>() });
+  // Recorded before the request (a realtime refetch can arrive before the response) and
+  // restored if the request fails.
+  const recordOwnTranslatorChange = (added: string[], removed: string[]) => {
+    const previous = {
+      added: new Set(ownTranslatorChanges.current.added),
+      removed: new Set(ownTranslatorChanges.current.removed),
+    };
+    added.forEach((id) => {
+      ownTranslatorChanges.current.added.add(id);
+      ownTranslatorChanges.current.removed.delete(id);
+    });
+    removed.forEach((id) => {
+      ownTranslatorChanges.current.removed.add(id);
+      ownTranslatorChanges.current.added.delete(id);
+    });
+    return { previousOwnTranslatorChanges: previous };
+  };
 
   // Include project's current system in the list if it's not already there
   const SYSTEMS =
@@ -175,15 +212,6 @@ export default function EditProjectPage() {
 
   const supabase = createBrowserClient(supabaseUrl, supabaseKey);
 
-  const formatDateForInput = (date: string | null | undefined) => {
-    if (!date) return "";
-    try {
-      return format(new Date(date), "yyyy-MM-dd");
-    } catch {
-      return "";
-    }
-  };
-
   // Build form values from project data
   const formValues: ProjectFormValues | undefined = React.useMemo(() => {
     if (!project) return undefined;
@@ -196,9 +224,9 @@ export default function EditProjectPage() {
       lines: project.lines ?? null,
       language_in: project.language_in || null,
       language_out: project.language_out || null,
-      initial_deadline: formatDateForInput(project.initial_deadline),
-      interim_deadline: formatDateForInput(project.interim_deadline),
-      final_deadline: formatDateForInput(project.final_deadline),
+      initial_deadline: toDateInputValue(project.initial_deadline),
+      interim_deadline: toDateInputValue(project.interim_deadline),
+      final_deadline: toDateInputValue(project.final_deadline),
       instructions: project.instructions ?? null,
       paid: project.paid ?? false,
       invoiced: project.invoiced ?? false,
@@ -290,11 +318,13 @@ export default function EditProjectPage() {
     }
 
     // Check translator assignments
-    const originalTranslatorIds = new Set(originalProject.translators?.map((t) => t.id) || []);
+    const expectedTranslatorIds = new Set(originalProject.translators?.map((t) => t.id) || []);
+    ownTranslatorChanges.current.added.forEach((id) => expectedTranslatorIds.add(id));
+    ownTranslatorChanges.current.removed.forEach((id) => expectedTranslatorIds.delete(id));
     const currentTranslatorIds = new Set(project.translators?.map((t) => t.id) || []);
 
-    const addedTranslators = project.translators?.filter((t) => !originalTranslatorIds.has(t.id)) || [];
-    const removedTranslators = originalProject.translators?.filter((t) => !currentTranslatorIds.has(t.id)) || [];
+    const addedTranslators = [...currentTranslatorIds].filter((id) => !expectedTranslatorIds.has(id));
+    const removedTranslators = [...expectedTranslatorIds].filter((id) => !currentTranslatorIds.has(id));
 
     if (addedTranslators.length > 0 || removedTranslators.length > 0) {
       const originalNames = originalProject.translators?.map((t) => t.name).join(", ") || "None";
@@ -362,13 +392,13 @@ export default function EditProjectPage() {
         ? project.language_out || null
         : currentFormValues.language_out,
       initial_deadline: dbChangedFields.has("initial_deadline")
-        ? formatDateForInput(project.initial_deadline)
+        ? toDateInputValue(project.initial_deadline)
         : currentFormValues.initial_deadline,
       interim_deadline: dbChangedFields.has("interim_deadline")
-        ? formatDateForInput(project.interim_deadline)
+        ? toDateInputValue(project.interim_deadline)
         : currentFormValues.interim_deadline,
       final_deadline: dbChangedFields.has("final_deadline")
-        ? formatDateForInput(project.final_deadline)
+        ? toDateInputValue(project.final_deadline)
         : currentFormValues.final_deadline,
       instructions: dbChangedFields.has("instructions")
         ? project.instructions || null
@@ -417,6 +447,7 @@ export default function EditProjectPage() {
 
     // Update original project to current state
     setOriginalProject(project);
+    ownTranslatorChanges.current = { added: new Set(), removed: new Set() };
     setShowConflictModal(false);
     setConflicts([]);
   }, [form, project, originalProject]);
@@ -432,16 +463,6 @@ export default function EditProjectPage() {
     mutationFn: async (values: ProjectFormValues) => {
       if (!projectId) throw new Error("Project ID is required");
 
-      const formatDateForDB = (dateStr: string | null | undefined) => {
-        if (!dateStr || dateStr === "") return null;
-        try {
-          const date = new Date(dateStr);
-          return isNaN(date.getTime()) ? null : date.toISOString();
-        } catch {
-          return null;
-        }
-      };
-
       const parseArrayField = (val: string | null | undefined): string[] | null => {
         if (!val || val.trim() === "") return null;
         return val.split(",").map((s) => s.trim()).filter(Boolean);
@@ -455,9 +476,10 @@ export default function EditProjectPage() {
         lines: values.lines ?? null,
         language_in: values.language_in || null,
         language_out: values.language_out || null,
-        initial_deadline: formatDateForDB(values.initial_deadline),
-        interim_deadline: formatDateForDB(values.interim_deadline),
-        final_deadline: formatDateForDB(values.final_deadline),
+        // Keep the stored time of day: the form only edits the date part.
+        initial_deadline: dateInputToTimestamp(values.initial_deadline, project?.initial_deadline),
+        interim_deadline: dateInputToTimestamp(values.interim_deadline, project?.interim_deadline),
+        final_deadline: dateInputToTimestamp(values.final_deadline, project?.final_deadline),
         instructions: values.instructions || null,
         paid: values.paid ?? false,
         invoiced: values.invoiced ?? false,
@@ -488,6 +510,7 @@ export default function EditProjectPage() {
       queryClient.invalidateQueries({ queryKey: queryKeys.project(projectId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.projects() });
       queryClient.invalidateQueries({ queryKey: queryKeys.projectsWithTranslators() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.homeManageProjectsCount() });
       if (values.status === "complete") {
         resetManagementToStart();
       }
@@ -510,26 +533,14 @@ export default function EditProjectPage() {
       userIds: string[];
       messages: Record<string, string>;
     }) => {
-      const assignments = userIds.map((userId) => ({
-        project_id: projectId,
-        user_id: userId,
-        assignment_status: "unclaimed",
-        initial_message: messages[userId] || null,
-      }));
-
-      const { error } = await supabase
-        .from("projects_assignment")
-        .insert(assignments);
-
-      if (error) throw new Error(`Failed to add collaborators: ${error.message}`);
+      await addCollaborators(
+        supabase,
+        userIds.map((userId) => ({ projectId, userId, message: messages[userId] })),
+        user?.id
+      );
     },
-    onSuccess: (_, { userIds }) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.project(projectId) });
-      queryClient.invalidateQueries({ queryKey: ["projects-with-translators"] });
-      userIds.forEach((uid) => {
-        queryClient.invalidateQueries({ queryKey: queryKeys.myProjects(uid) });
-        queryClient.invalidateQueries({ queryKey: queryKeys.homeMyProjectsCount(uid) });
-      });
+    onSuccess: (_, { projectId, userIds }) => {
+      invalidateCollaboratorQueries(queryClient, [projectId], userIds);
       toast.success("Collaborators added successfully");
       setAddTranslatorModal({
         open: false,
@@ -537,12 +548,10 @@ export default function EditProjectPage() {
         projectName: "",
         assignedTranslatorIds: [],
       });
-      // Update original project to include new translators (avoid conflict modal for our own changes)
-      if (project) {
-        setOriginalProject(project);
-      }
     },
-    onError: (error: Error) => {
+    onMutate: ({ userIds }) => recordOwnTranslatorChange(userIds, []),
+    onError: (error: Error, _, context) => {
+      if (context) ownTranslatorChanges.current = context.previousOwnTranslatorChanges;
       toast.error(getUserFriendlyError(error, "project update"));
     },
   });
@@ -556,29 +565,16 @@ export default function EditProjectPage() {
       projectId: number;
       userId: string;
     }) => {
-      const { error } = await supabase
-        .from("projects_assignment")
-        .delete()
-        .eq("project_id", projectId)
-        .eq("user_id", userId);
-
-      if (error) {
-        throw new Error(`Failed to remove collaborator: ${error.message}`);
-      }
+      await removeCollaborator(supabase, projectId, userId);
     },
-    onSuccess: (_, { userId }) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.project(projectId) });
-      queryClient.invalidateQueries({ queryKey: ["projects-with-translators"] });
-      queryClient.invalidateQueries({ queryKey: queryKeys.myProjects(userId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.homeMyProjectsCount(userId) });
+    onSuccess: (_, { projectId, userId }) => {
+      invalidateCollaboratorQueries(queryClient, [projectId], [userId]);
       toast.success("Collaborator removed successfully");
       setTranslatorToRemove(null);
-      // Update original project to reflect removal (avoid conflict modal for our own changes)
-      if (project) {
-        setOriginalProject(project);
-      }
     },
-    onError: (error: Error) => {
+    onMutate: ({ userId }) => recordOwnTranslatorChange([], [userId]),
+    onError: (error: Error, _, context) => {
+      if (context) ownTranslatorChanges.current = context.previousOwnTranslatorChanges;
       toast.error(getUserFriendlyError(error, "project update"));
     },
   });

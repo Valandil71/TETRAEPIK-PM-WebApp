@@ -4,7 +4,6 @@ import { useQuery } from '@tanstack/react-query';
 import { useSupabase } from '@/hooks/core/useSupabase';
 import type { ProjectWithTranslatorDetails } from '@/types/project';
 import { queryKeys } from "@/lib/queryKeys";
-import { useOriginalRecordStore } from "@/lib/stores/useOriginalRecordStore";
 
 interface AssignmentUserRow {
   id: string;
@@ -25,7 +24,6 @@ interface ProjectAssignmentRow {
 
 export function useProject(projectId: number | string | null) {
   const supabase = useSupabase();
-  const setOriginal = useOriginalRecordStore((s) => s.setOriginal);
 
   return useQuery({
     queryKey: queryKeys.project(projectId),
@@ -84,9 +82,6 @@ export function useProject(projectId: number | string | null) {
         avatar: assignment.users?.avatar || null,
       }))
         .filter((t) => t.id); // Filter out any invalid entries
-
-      // Store original project record for concurrency conflict detection
-      setOriginal('projects', { id: project.id }, project);
 
       return {
         ...project,

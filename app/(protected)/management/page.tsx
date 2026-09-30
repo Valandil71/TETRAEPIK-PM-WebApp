@@ -39,7 +39,12 @@ import { useManagementPageStore } from "@/lib/stores/useManagementPageStore";
 import { useLayoutStore } from "@/lib/stores/useLayoutStore";
 import type { SapInstructionEntry } from "@/types/project";
 import { groupProjectsForDisplay } from "@/lib/projectGrouping";
-import { toStmImportKey } from "@/lib/sap/import-keys";
+import {
+  addCollaborators,
+  invalidateCollaboratorQueries,
+  removeCollaborator,
+} from "@/lib/projects/collaborators";
+import { createStmProject } from "@/lib/projects/stm";
 import { useProjectGroupExpansion } from "@/hooks/project/useProjectGroupExpansion";
 import { useProjectListPagination } from "@/hooks/project/useProjectListPagination";
 import { useWindowScrollMemory } from "@/hooks/ui/useWindowScrollMemory";
@@ -400,10 +405,12 @@ function ProjectManagementContent() {
       if (error)
         throw new Error(`Failed to mark project as complete: ${error.message}`);
     },
-    onSuccess: () => {
+    onSuccess: (_, projectId) => {
       queryClient.invalidateQueries({
         queryKey: queryKeys.projectsWithTranslators(),
       });
+      queryClient.invalidateQueries({ queryKey: queryKeys.project(projectId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.homeManageProjectsCount() });
       toast.success("Project marked as complete");
       setOpenMenu(null);
     },
@@ -421,25 +428,14 @@ function ProjectManagementContent() {
       userIds: string[];
       messages: Record<string, string>;
     }) => {
-      const assignments = userIds.map((userId) => ({
-        project_id: projectId,
-        user_id: userId,
-        assignment_status: userId === user?.id ? "claimed" : "unclaimed", // Auto-claim if self-assigning
-        initial_message: messages[userId] || null,
-      }));
-
-      const { error } = await supabase
-        .from("projects_assignment")
-        .insert(assignments);
-      if (error) throw new Error(`Failed to add collaborators: ${error.message}`);
+      await addCollaborators(
+        supabase,
+        userIds.map((userId) => ({ projectId, userId, message: messages[userId] })),
+        user?.id
+      );
     },
     onSuccess: (_, { projectId, userIds }) => {
-      queryClient.invalidateQueries({ queryKey: ["projects-with-translators"] });
-      queryClient.invalidateQueries({ queryKey: queryKeys.project(projectId) });
-      userIds.forEach((uid) => {
-        queryClient.invalidateQueries({ queryKey: queryKeys.myProjects(uid) });
-        queryClient.invalidateQueries({ queryKey: queryKeys.homeMyProjectsCount(uid) });
-      });
+      invalidateCollaboratorQueries(queryClient, [projectId], userIds);
       toast.success("Collaborators added successfully");
       setAddTranslatorModal({
         open: false,
@@ -454,21 +450,11 @@ function ProjectManagementContent() {
 
   const selfAssignMutation = useMutation({
     mutationFn: async ({ projectId, userId }: { projectId: number; userId: string }) => {
-      const { error } = await supabase.from("projects_assignment").insert({
-        project_id: projectId,
-        user_id: userId,
-        assignment_status: "claimed",
-        initial_message: null,
-      });
-      if (error) throw new Error(`Failed to self-assign: ${error.message}`);
+      // Assigning yourself makes the assignment start as "claimed"
+      await addCollaborators(supabase, [{ projectId, userId }], userId);
     },
     onSuccess: (_, { projectId, userId }) => {
-      queryClient.invalidateQueries({ queryKey: ["projects-with-translators"] });
-      queryClient.invalidateQueries({ queryKey: queryKeys.project(projectId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.myProjects(userId) });
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.homeMyProjectsCount(userId),
-      });
+      invalidateCollaboratorQueries(queryClient, [projectId], [userId]);
       toast.success("Project assigned to you");
     },
     onError: (error: Error) =>
@@ -483,107 +469,10 @@ function ProjectManagementContent() {
       projectId: number; // bigint in database
       userId: string; // uuid in database
     }) => {
-      // Ensure we have valid IDs
-      if (!projectId || !userId) {
-        throw new Error("Project ID and User ID are required");
-      }
-
-      // Check if current user is admin or PM (they should be able to delete any assignment)
-      const isAdminOrPM = user && (user.role === "admin" || user.role === "pm");
-      const isDeletingSelf = user && user.id === userId;
-
-      // First, verify the assignment exists before deleting
-      const { data: existingAssignment, error: checkError } = await supabase
-        .from("projects_assignment")
-        .select("project_id, user_id")
-        .eq("project_id", projectId)
-        .eq("user_id", userId)
-        .single();
-
-      if (checkError || !existingAssignment) {
-        throw new Error(
-          `Collaborator assignment not found. No row exists with project_id=${projectId} and user_id=${userId}`
-        );
-      }
-
-      // Delete the specific row using the composite primary key (project_id, user_id)
-      // According to schema: constraint projects_assignment_pkey primary key (project_id, user_id)
-      // Note: If RLS is blocking self-deletion, admins/PMs should still be able to delete
-      const { error } = await supabase
-        .from("projects_assignment")
-        .delete()
-        .eq("project_id", projectId) // bigint - matches projects.id
-        .eq("user_id", userId); // uuid - matches users.id
-
-      if (error) {
-        // Check if this is the database trigger error (column pm_id doesn't exist)
-        // Error code 42703 = undefined_column in PostgreSQL
-        if (error.code === "42703" && error.message?.includes("pm_id")) {
-          console.error("Database trigger error - pm_id column missing:", {
-            error,
-            projectId,
-            userId,
-            isDeletingSelf,
-            isAdminOrPM,
-            currentUserId: user?.id,
-          });
-
-          throw new Error(
-            `Database configuration error: The trigger function is trying to update a 'pm_id' column that doesn't exist in the projects table. Please contact your database administrator to fix the 'clear_pm_if_no_assignments()' function or add the missing 'pm_id' column to the projects table.`
-          );
-        }
-
-        // Enhanced error message with context for other errors
-        const errorContext =
-          isDeletingSelf ? " (Attempting to delete own assignment)" : "";
-        const roleContext =
-          isAdminOrPM ?
-            " (User is admin/PM)"
-          : ` (User role: ${user?.role || "unknown"})`;
-
-        console.error("Delete error details:", {
-          error,
-          projectId,
-          userId,
-          isDeletingSelf,
-          isAdminOrPM,
-          currentUserId: user?.id,
-          errorCode: error.code,
-          errorDetails: error.details,
-          errorHint: error.hint,
-        });
-
-        throw new Error(
-          `Failed to remove collaborator: ${error.message}${errorContext}${roleContext}. Project ID: ${projectId}, User ID: ${userId}`
-        );
-      }
-
-      // Verify deletion was successful by checking if assignment still exists
-      // Wait a small moment for the delete to propagate
-      await new Promise((resolve) => setTimeout(resolve, 100));
-
-      const { data: verifyAssignment, error: verifyError } = await supabase
-        .from("projects_assignment")
-        .select("project_id, user_id")
-        .eq("project_id", projectId)
-        .eq("user_id", userId)
-        .maybeSingle();
-
-      // If assignment still exists and it's not a permission error, throw
-      if (verifyAssignment && !verifyError) {
-        throw new Error(
-          "Delete operation completed but assignment still exists. This may be due to RLS policies preventing the deletion."
-        );
-      }
-
-      // Return the deleted assignment data for confirmation
-      return existingAssignment;
+      await removeCollaborator(supabase, projectId, userId);
     },
     onSuccess: (_, { projectId, userId }) => {
-      queryClient.invalidateQueries({ queryKey: ["projects-with-translators"] });
-      queryClient.invalidateQueries({ queryKey: queryKeys.project(projectId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.myProjects(userId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.homeMyProjectsCount(userId) });
+      invalidateCollaboratorQueries(queryClient, [projectId], [userId]);
       toast.success("Collaborator removed successfully");
       setRemoveTranslatorModal({
         open: false,
@@ -630,42 +519,7 @@ function ProjectManagementContent() {
   });
 
   const createStmProjectMutation = useMutation({
-    mutationFn: async (projectId: number) => {
-      const { data: sourceProject, error: sourceError } = await supabase
-        .from("projects")
-        .select("*")
-        .eq("id", projectId)
-        .single();
-
-      if (sourceError || !sourceProject) {
-        throw new Error(
-          `Failed to load source project: ${sourceError?.message || "Project not found"}`
-        );
-      }
-
-      const { id, created_at, updated_at, ...projectData } = sourceProject;
-      void id;
-      void created_at;
-      void updated_at;
-
-      const { data: newProject, error: createError } = await supabase
-        .from("projects")
-        .insert({
-          ...projectData,
-          system: "STM",
-          sap_import_key: toStmImportKey(projectData.sap_import_key),
-        })
-        .select("id")
-        .single();
-
-      if (createError || !newProject) {
-        throw new Error(
-          `Failed to create STM project: ${createError?.message || "Unknown error"}`
-        );
-      }
-
-      return newProject;
-    },
+    mutationFn: (projectId: number) => createStmProject(supabase, projectId),
     onMutate: (projectId) => {
       setCreatingStmProjectId(projectId);
     },
