@@ -7,7 +7,7 @@ const SAP_IMPORT_STATUS_ROW_ID = 1;
 
 export async function GET() {
   try {
-    const auth = await getAuthenticatedSupabase();
+    const auth = await getAuthenticatedSupabase(['pm', 'admin']);
     if ('error' in auth) return auth.error;
     const { supabase, user } = auth;
 

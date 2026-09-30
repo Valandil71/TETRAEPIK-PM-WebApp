@@ -10,7 +10,7 @@ import { isBlockedSapProjectType } from '@/lib/sap/project-type-rules';
 
 export async function GET() {
   try {
-    const auth = await getAuthenticatedSupabase();
+    const auth = await getAuthenticatedSupabase(['pm', 'admin']);
     if ('error' in auth) return auth.error;
 
     // Fetch SAP projects

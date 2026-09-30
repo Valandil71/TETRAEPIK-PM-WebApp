@@ -287,6 +287,8 @@ export default function ProjectPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.project(projectId) });
+      queryClient.invalidateQueries({ queryKey: ["projects-with-translators"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.homeManageProjectsCount() });
       toast.success("Project marked as complete");
     },
     onError: (error: Error) => {

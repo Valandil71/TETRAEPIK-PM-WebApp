@@ -400,10 +400,12 @@ function ProjectManagementContent() {
       if (error)
         throw new Error(`Failed to mark project as complete: ${error.message}`);
     },
-    onSuccess: () => {
+    onSuccess: (_, projectId) => {
       queryClient.invalidateQueries({
         queryKey: queryKeys.projectsWithTranslators(),
       });
+      queryClient.invalidateQueries({ queryKey: queryKeys.project(projectId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.homeManageProjectsCount() });
       toast.success("Project marked as complete");
       setOpenMenu(null);
     },

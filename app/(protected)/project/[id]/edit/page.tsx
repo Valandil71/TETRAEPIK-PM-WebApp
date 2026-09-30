@@ -11,7 +11,6 @@ import { formatRoleDisplay } from "@/utils/formatters";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { format } from "date-fns";
 import {
   Form,
   FormControl,
@@ -40,6 +39,10 @@ import { queryKeys } from "@/lib/queryKeys";
 import { useLayoutStore } from "@/lib/stores/useLayoutStore";
 import { useManagementPageStore } from "@/lib/stores/useManagementPageStore";
 import type { ProjectWithTranslatorDetails } from "@/types/project";
+import { dateInputToTimestamp, toDateInputValue } from "@/lib/date-utils";
+import { RoleGuard } from "@/components/auth/RoleGuard";
+import { RouteId } from "@/lib/roleAccess";
+import { useRoleAccess } from "@/hooks/user/useRoleAccess";
 
 const projectSchema = z.object({
   name: z.string().min(1, "Project name is required"),
@@ -131,12 +134,21 @@ const MONITORED_FIELDS = [
 ];
 
 export default function EditProjectPage() {
+  return (
+    <RoleGuard routeId={RouteId.PROJECT_EDIT}>
+      <EditProjectContent />
+    </RoleGuard>
+  );
+}
+
+function EditProjectContent() {
   const params = useParams();
   const router = useRouter();
   const queryClient = useQueryClient();
   const projectId = params.id ? Number(params.id) : null;
 
   const { data: project, isLoading, error } = useProject(projectId);
+  const { user } = useRoleAccess();
   const collapsed = useLayoutStore((state) => state.collapsed);
   const resetManagementToStart = useManagementPageStore((state) => state.resetToStart);
 
@@ -175,15 +187,6 @@ export default function EditProjectPage() {
 
   const supabase = createBrowserClient(supabaseUrl, supabaseKey);
 
-  const formatDateForInput = (date: string | null | undefined) => {
-    if (!date) return "";
-    try {
-      return format(new Date(date), "yyyy-MM-dd");
-    } catch {
-      return "";
-    }
-  };
-
   // Build form values from project data
   const formValues: ProjectFormValues | undefined = React.useMemo(() => {
     if (!project) return undefined;
@@ -196,9 +199,9 @@ export default function EditProjectPage() {
       lines: project.lines ?? null,
       language_in: project.language_in || null,
       language_out: project.language_out || null,
-      initial_deadline: formatDateForInput(project.initial_deadline),
-      interim_deadline: formatDateForInput(project.interim_deadline),
-      final_deadline: formatDateForInput(project.final_deadline),
+      initial_deadline: toDateInputValue(project.initial_deadline),
+      interim_deadline: toDateInputValue(project.interim_deadline),
+      final_deadline: toDateInputValue(project.final_deadline),
       instructions: project.instructions ?? null,
       paid: project.paid ?? false,
       invoiced: project.invoiced ?? false,
@@ -362,13 +365,13 @@ export default function EditProjectPage() {
         ? project.language_out || null
         : currentFormValues.language_out,
       initial_deadline: dbChangedFields.has("initial_deadline")
-        ? formatDateForInput(project.initial_deadline)
+        ? toDateInputValue(project.initial_deadline)
         : currentFormValues.initial_deadline,
       interim_deadline: dbChangedFields.has("interim_deadline")
-        ? formatDateForInput(project.interim_deadline)
+        ? toDateInputValue(project.interim_deadline)
         : currentFormValues.interim_deadline,
       final_deadline: dbChangedFields.has("final_deadline")
-        ? formatDateForInput(project.final_deadline)
+        ? toDateInputValue(project.final_deadline)
         : currentFormValues.final_deadline,
       instructions: dbChangedFields.has("instructions")
         ? project.instructions || null
@@ -432,16 +435,6 @@ export default function EditProjectPage() {
     mutationFn: async (values: ProjectFormValues) => {
       if (!projectId) throw new Error("Project ID is required");
 
-      const formatDateForDB = (dateStr: string | null | undefined) => {
-        if (!dateStr || dateStr === "") return null;
-        try {
-          const date = new Date(dateStr);
-          return isNaN(date.getTime()) ? null : date.toISOString();
-        } catch {
-          return null;
-        }
-      };
-
       const parseArrayField = (val: string | null | undefined): string[] | null => {
         if (!val || val.trim() === "") return null;
         return val.split(",").map((s) => s.trim()).filter(Boolean);
@@ -455,9 +448,10 @@ export default function EditProjectPage() {
         lines: values.lines ?? null,
         language_in: values.language_in || null,
         language_out: values.language_out || null,
-        initial_deadline: formatDateForDB(values.initial_deadline),
-        interim_deadline: formatDateForDB(values.interim_deadline),
-        final_deadline: formatDateForDB(values.final_deadline),
+        // Keep the stored time of day: the form only edits the date part.
+        initial_deadline: dateInputToTimestamp(values.initial_deadline, project?.initial_deadline),
+        interim_deadline: dateInputToTimestamp(values.interim_deadline, project?.interim_deadline),
+        final_deadline: dateInputToTimestamp(values.final_deadline, project?.final_deadline),
         instructions: values.instructions || null,
         paid: values.paid ?? false,
         invoiced: values.invoiced ?? false,
@@ -488,6 +482,7 @@ export default function EditProjectPage() {
       queryClient.invalidateQueries({ queryKey: queryKeys.project(projectId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.projects() });
       queryClient.invalidateQueries({ queryKey: queryKeys.projectsWithTranslators() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.homeManageProjectsCount() });
       if (values.status === "complete") {
         resetManagementToStart();
       }
@@ -513,7 +508,7 @@ export default function EditProjectPage() {
       const assignments = userIds.map((userId) => ({
         project_id: projectId,
         user_id: userId,
-        assignment_status: "unclaimed",
+        assignment_status: userId === user?.id ? "claimed" : "unclaimed", // Auto-claim if self-assigning
         initial_message: messages[userId] || null,
       }));
 
