@@ -3,9 +3,13 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  pickSapInstructionPreview,
+  PROJECT_LIST_PAGE_SIZE,
   useProjectsWithTranslators,
 } from "@/hooks/project/useProjectsWithTranslators";
+import {
+  pickSapInstructionPreview,
+  useSapInstructionPreviews,
+} from "@/hooks/project/useSapInstructionPreviews";
 import { getInstructionsPreview } from "@/utils/instructionsPreview";
 import type { SapInstructionEntry } from "@/types/project";
 
@@ -42,6 +46,10 @@ function from(table: string) {
     },
     not(...args: unknown[]) {
       query.filters.push(["not", ...args]);
+      return builder;
+    },
+    range(...args: unknown[]) {
+      query.filters.push(["range", ...args]);
       return builder;
     },
     then(onFulfilled: (value: { data: unknown[]; error: null }) => unknown) {
@@ -88,6 +96,7 @@ function defaultResolver(query: RecordedQuery): unknown[] {
   }
   const inFilter = query.filters.find(([name]) => name === "in");
   if (!inFilter) {
+    if (pageStart(query) > 0) return [];
     return [
       projectRow(1, "Use glossary", [{ assignment_status: "claimed", done_message: null, users: user }]),
       projectRow(2, null),
@@ -102,6 +111,10 @@ function defaultResolver(query: RecordedQuery): unknown[] {
     return withSap.map((id) => ({ id, sap_first: sapByProject[id]![0] }));
   }
   return withSap.map((id) => ({ id, sap_instructions: sapByProject[id] }));
+}
+
+function pageStart(query: RecordedQuery): number {
+  return (query.filters.find(([name]) => name === "range")?.[1] as number) ?? 0;
 }
 
 function wrapper({ children }: { children: ReactNode }) {
@@ -181,21 +194,65 @@ describe("useProjectsWithTranslators", () => {
     }
   });
 
-  it("chunks the id filter when listing all statuses", async () => {
-    const rows = Array.from({ length: 450 }, (_, i) => projectRow(i + 1, null));
+  it("loads every completed project page by page and skips SAP data", async () => {
+    const total = PROJECT_LIST_PAGE_SIZE * 2 + 25;
+    const rows = Array.from({ length: total }, (_, i) => projectRow(i + 1, null));
     resolve = (query) => {
-      if (!query.filters.some(([name]) => name === "in")) return rows;
-      return [];
+      const from = pageStart(query);
+      return rows.slice(from, from + PROJECT_LIST_PAGE_SIZE);
     };
 
-    const { result } = renderHook(() => useProjectsWithTranslators(false, true, true), { wrapper });
+    const { result } = renderHook(() => useProjectsWithTranslators(false, true, "complete"), { wrapper });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
-    expect(recorded[0].filters.some(([name]) => name === "eq")).toBe(false);
-    const chunkSizes = recorded
-      .filter((q) => q.select.includes("sap_first"))
-      .map((q) => (q.filters.find(([name]) => name === "in")![2] as number[]).length);
-    expect(chunkSizes).toEqual([200, 200, 50]);
-    expect(result.current.data).toHaveLength(450);
+    expect(result.current.data).toHaveLength(total);
+    expect(recorded.map((q) => q.filters.find(([name]) => name === "range"))).toEqual([
+      ["range", 0, 999],
+      ["range", 1000, 1999],
+      ["range", 2000, 2999],
+    ]);
+    expect(recorded.every((q) => q.filters.some((f) => f[0] === "eq" && f[2] === "complete"))).toBe(true);
+    // Completed lists load SAP previews per visible page instead
+    expect(recorded.some((q) => q.select.includes("sap"))).toBe(false);
+    expect(result.current.data!.every((p) => p.sap_instructions === null)).toBe(true);
+  });
+});
+
+describe("useSapInstructionPreviews", () => {
+  beforeEach(() => {
+    recorded.length = 0;
+    resolve = defaultResolver;
+  });
+
+  it("fills previews for the visible rows only, matching the full data", async () => {
+    const groups = [
+      { key: "a", name: "A", projects: [1, 2, 3].map((id) => ({ id, instructions: id === 1 ? "Use glossary" : null, sap_instructions: null })) },
+      { key: "b", name: "B", projects: [4].map((id) => ({ id, instructions: "", sap_instructions: null })) },
+    ];
+
+    const { result } = renderHook(() => useSapInstructionPreviews(groups), { wrapper });
+    await waitFor(() => expect(result.current[0].projects[1].sap_instructions).not.toBeNull());
+
+    const firstEntryQuery = recorded.find((q) => q.select.includes("sap_first"))!;
+    expect(firstEntryQuery.filters).toContainEqual(["in", "id", [2, 3, 4]]);
+
+    const exclusionSet = new Set(["boilerplate"]);
+    for (const project of result.current.flatMap((group) => group.projects)) {
+      expect(
+        getInstructionsPreview({ instructions: project.instructions, sapInstructions: project.sap_instructions, exclusionSet })
+      ).toEqual(
+        getInstructionsPreview({ instructions: project.instructions, sapInstructions: sapByProject[project.id], exclusionSet })
+      );
+    }
+  });
+
+  it("chunks large id lists", async () => {
+    const groups = [{ key: "a", name: "A", projects: Array.from({ length: 450 }, (_, i) => ({ id: i + 1, instructions: null })) }];
+    resolve = () => [];
+
+    renderHook(() => useSapInstructionPreviews(groups), { wrapper });
+    await waitFor(() => expect(recorded.length).toBe(3));
+
+    expect(recorded.map((q) => (q.filters.find(([name]) => name === "in")![2] as number[]).length)).toEqual([200, 200, 50]);
   });
 });

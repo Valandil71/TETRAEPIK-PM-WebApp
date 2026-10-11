@@ -6,9 +6,9 @@ describe('queryKeys.projectsWithTranslators', () => {
   it('invalidating without arguments refreshes every project list variant', async () => {
     const queryClient = new QueryClient();
     const lists = [
-      queryKeys.projectsWithTranslators(false, true, false), // management, workload, home
-      queryKeys.projectsWithTranslators(false, true, true), // concluded, invoicing
-      queryKeys.projectsWithTranslators(false, false, false), // project table
+      queryKeys.projectsWithTranslators(false, true, "active"), // management, workload, home
+      queryKeys.projectsWithTranslators(false, true, "complete"), // concluded, invoicing
+      queryKeys.projectsWithTranslators(false, false, "active"), // project table
     ];
     lists.forEach((key) => queryClient.setQueryData(key, []));
 
@@ -18,8 +18,8 @@ describe('queryKeys.projectsWithTranslators', () => {
   });
 
   it('keeps list variants as distinct cache entries', () => {
-    expect(queryKeys.projectsWithTranslators(false, true, false)).not.toEqual(
-      queryKeys.projectsWithTranslators(false, true, true)
+    expect(queryKeys.projectsWithTranslators(false, true, "active")).not.toEqual(
+      queryKeys.projectsWithTranslators(false, true, "complete")
     );
   });
 });

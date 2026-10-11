@@ -116,6 +116,7 @@ export function useInstructionExclusions(currentUserId: string | null): UseInstr
       // Project lists only carry the first visible SAP entry; a new exclusion may hide it,
       // so refetch them to pick up the next visible entry.
       queryClient.invalidateQueries({ queryKey: queryKeys.projectsWithTranslators() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.sapInstructionPreviews() });
     },
   });
 

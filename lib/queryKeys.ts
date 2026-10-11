@@ -5,6 +5,9 @@
  * and makes it easier to invalidate related queries.
  */
 
+/** Project status a project list is filtered by. */
+export type ProjectListStatus = 'active' | 'complete';
+
 export const queryKeys = {
   // User-related queries
   user: () => ['user'] as const,
@@ -17,10 +20,15 @@ export const queryKeys = {
   projectInstructions: (id: number | null) => ['project', id, 'instructions'] as const,
   projects: () => ['projects'] as const,
   // Called without arguments it returns the prefix, so invalidating it refreshes every list variant.
-  projectsWithTranslators: (showPast?: boolean, showAll?: boolean, includeAllStatuses?: boolean) =>
+  // The 4th element is the list's project status; realtime invalidation relies on that position.
+  projectsWithTranslators: (showPast?: boolean, showAll?: boolean, status?: ProjectListStatus) =>
     showPast === undefined
       ? (['projects-with-translators'] as const)
-      : (['projects-with-translators', showPast, showAll, includeAllStatuses] as const),
+      : (['projects-with-translators', showPast, showAll, status] as const),
+  sapInstructionPreviews: (projectIds?: number[]) =>
+    projectIds === undefined
+      ? (['sap-instruction-previews'] as const)
+      : (['sap-instruction-previews', projectIds] as const),
   myProjects: (userId: string | null) => ['my-projects', userId] as const,
 
   // Home page counts

@@ -2,10 +2,12 @@
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSupabase } from '@/hooks/core/useSupabase';
-import type { ProjectWithTranslators, ProjectTranslator, SapInstructionEntry } from '@/types/project';
-import { queryKeys } from "@/lib/queryKeys";
-import { fetchInstructionExclusions } from '@/hooks/settings/useInstructionExclusions';
-import { filterSapInstructions, toInstructionExclusionSet } from '@/lib/sap/instruction-exclusions';
+import type { ProjectWithTranslators, ProjectTranslator } from '@/types/project';
+import { queryKeys, type ProjectListStatus } from "@/lib/queryKeys";
+import {
+  getBlankInstructionIds,
+  loadSapInstructionPreviews,
+} from '@/hooks/project/useSapInstructionPreviews';
 
 interface AssignmentUserRow {
   id: string;
@@ -27,6 +29,7 @@ type ProjectListRow = Omit<ProjectWithTranslators, "translators" | "sap_instruct
 
 // `sap_instructions` is deliberately not selected here: it is ~95% of the list payload.
 // See loadSapInstructionPreviews for how the list still gets what the previews need.
+// created_at/updated_at are not selected either: no list view reads them.
 const PROJECT_LIST_SELECT = `
   id,
   name,
@@ -43,8 +46,6 @@ const PROJECT_LIST_SELECT = `
   paid,
   invoiced,
   project_type,
-  created_at,
-  updated_at,
   projects_assignment (
     assignment_status,
     done_message,
@@ -58,140 +59,61 @@ const PROJECT_LIST_SELECT = `
   )
 `;
 
-// Keeps `.in()` filters well under URL length limits when all ~2,000 projects are listed.
-const ID_CHUNK_SIZE = 200;
+// PostgREST returns at most this many rows per request (the project's db-max-rows),
+// so larger lists are fetched page by page.
+export const PROJECT_LIST_PAGE_SIZE = 1000;
 
-function chunk<T>(items: T[], size: number): T[][] {
-  const chunks: T[][] = [];
-  for (let i = 0; i < items.length; i += size) {
-    chunks.push(items.slice(i, i + size));
+async function fetchProjectListRows(
+  supabase: ReturnType<typeof useSupabase>,
+  status: ProjectListStatus
+): Promise<ProjectListRow[]> {
+  const rows: ProjectListRow[] = [];
+  for (let from = 0; ; from += PROJECT_LIST_PAGE_SIZE) {
+    const { data, error } = await supabase
+      .from('projects')
+      .select(PROJECT_LIST_SELECT)
+      .eq('status', status)
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false }) // stable order across pages
+      .range(from, from + PROJECT_LIST_PAGE_SIZE - 1);
+
+    if (error) {
+      throw new Error(`Failed to fetch projects: ${error.message}`);
+    }
+
+    const page = (data ?? []) as ProjectListRow[];
+    rows.push(...page);
+    if (page.length < PROJECT_LIST_PAGE_SIZE) return rows;
   }
-  return chunks;
 }
 
 /**
- * Picks the SAP entries a list row needs for getInstructionsPreview: the first entry when it
- * survives the exclusion filter, otherwise null (the caller then loads the full array).
+ * @param status "active" for the working lists; "complete" for Concluded Projects and
+ * Invoicing. Complete lists hold ~2,000 rows, so they skip SAP previews here and the
+ * pages load them for the visible rows only (useSapInstructionPreviews).
  */
-export function pickSapInstructionPreview(
-  firstEntry: SapInstructionEntry | null,
-  exclusionSet: Set<string>
-): SapInstructionEntry[] | null {
-  if (!firstEntry) return null;
-  return filterSapInstructions([firstEntry], exclusionSet).length > 0 ? [firstEntry] : null;
-}
-
-type SupabaseClient = ReturnType<typeof useSupabase>;
-
-async function fetchInChunks<T>(
-  ids: number[],
-  fetchChunk: (chunkIds: number[]) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>
-): Promise<T[]> {
-  const results = await Promise.all(chunk(ids, ID_CHUNK_SIZE).map(fetchChunk));
-  return results.flatMap(({ data, error }) => {
-    if (error) throw new Error(`Failed to fetch SAP instructions: ${error.message}`);
-    return data ?? [];
-  });
-}
-
-/**
- * List views only use SAP instructions to label rows without manual instructions as
- * "SAP instructions" vs "No instructions" (getInstructionsPreview). For those rows we fetch
- * just the first entry and fall back to the full array only when that entry is excluded.
- * Rows with manual instructions get no SAP data; the full text is loaded on demand
- * (useProjectInstructions).
- */
-async function loadSapInstructionPreviews(
-  supabase: SupabaseClient,
-  projectIds: number[],
-  getExclusionSet: () => Promise<Set<string>>
-): Promise<Map<number, SapInstructionEntry[] | null>> {
-  const previews = new Map<number, SapInstructionEntry[] | null>();
-  if (projectIds.length === 0) return previews;
-
-  const firstEntries = await fetchInChunks<{ id: number; sap_first: SapInstructionEntry | null }>(
-    projectIds,
-    (ids) =>
-      supabase
-        .from('projects')
-        .select('id, sap_first:sap_instructions->0')
-        .in('id', ids)
-        .not('sap_instructions', 'is', null)
-  );
-  if (firstEntries.length === 0) return previews;
-
-  const exclusionSet = await getExclusionSet();
-  const needFullIds: number[] = [];
-  for (const row of firstEntries) {
-    const preview = pickSapInstructionPreview(row.sap_first, exclusionSet);
-    if (preview) {
-      previews.set(row.id, preview);
-    } else {
-      needFullIds.push(row.id);
-    }
-  }
-
-  if (needFullIds.length > 0) {
-    const fullRows = await fetchInChunks<{ id: number; sap_instructions: SapInstructionEntry[] | null }>(
-      needFullIds,
-      (ids) => supabase.from('projects').select('id, sap_instructions').in('id', ids)
-    );
-    for (const row of fullRows) {
-      previews.set(row.id, row.sap_instructions);
-    }
-  }
-
-  return previews;
-}
-
 export function useProjectsWithTranslators(
   showPast: boolean = false,
   showAll: boolean = false,
-  includeAllStatuses: boolean = false
+  status: ProjectListStatus = "active"
 ) {
   const supabase = useSupabase();
   const queryClient = useQueryClient();
 
   return useQuery({
-    queryKey: queryKeys.projectsWithTranslators(showPast, showAll, includeAllStatuses),
+    queryKey: queryKeys.projectsWithTranslators(showPast, showAll, status),
     queryFn: async (): Promise<ProjectWithTranslators[]> => {
-      // Build the query. Assignments are embedded so only rows for the listed projects are fetched.
-      let query = supabase
-        .from('projects')
-        .select(PROJECT_LIST_SELECT)
-        .order('created_at', { ascending: false });
+      // Assignments are embedded so only rows for the listed projects are fetched.
+      const typedProjects = await fetchProjectListRows(supabase, status);
 
-      // Only filter by active status unless includeAllStatuses is true
-      // (invoicing page needs complete projects)
-      if (!includeAllStatuses) {
-        query = query.eq('status', 'active');
-      }
-
-      const { data: projects, error: projectsError } = await query;
-
-      if (projectsError) {
-        throw new Error(`Failed to fetch projects: ${projectsError.message}`);
-      }
-
-      if (!projects || projects.length === 0) {
+      if (typedProjects.length === 0) {
         return [];
       }
 
-      const typedProjects = projects as ProjectListRow[];
-
-      // getInstructionsPreview only falls back to SAP instructions when manual ones are blank
-      const blankInstructionIds = typedProjects
-        .filter((p) => !p.instructions || p.instructions.trim() === '')
-        .map((p) => p.id);
-
-      const sapPreviews = await loadSapInstructionPreviews(supabase, blankInstructionIds, async () =>
-        toInstructionExclusionSet(
-          await queryClient.fetchQuery({
-            queryKey: queryKeys.instructionExclusions(),
-            queryFn: () => fetchInstructionExclusions(supabase),
-          })
-        )
-      );
+      const sapPreviews =
+        status === "active" ?
+          await loadSapInstructionPreviews(supabase, queryClient, getBlankInstructionIds(typedProjects))
+        : new Map();
 
       // Combine projects with their translators
       const projectsWithTranslators: ProjectWithTranslators[] = typedProjects.map(

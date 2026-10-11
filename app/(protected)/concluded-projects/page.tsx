@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Loader2, AlertCircle, FileDown, X } from "lucide-react";
 import { useUser } from "@/hooks/user/useUser";
 import { useProjectsWithTranslators } from "@/hooks/project/useProjectsWithTranslators";
+import { useSapInstructionPreviews } from "@/hooks/project/useSapInstructionPreviews";
 import { useProjectFilters } from "@/hooks/project/useProjectFilters";
 import {
   PAST_DUE_DATE_OPTIONS,
@@ -75,7 +76,7 @@ function ConcludedProjectsContent() {
     data: projectsData = [],
     isLoading: projectsLoading,
     error: projectsError,
-  } = useProjectsWithTranslators(false, true, true);
+  } = useProjectsWithTranslators(false, true, "complete");
 
   const completedProjects = useMemo(
     () => projectsData.filter((p) => p.status === "complete"),
@@ -135,6 +136,9 @@ function ConcludedProjectsContent() {
     currentPage: storedCurrentPage,
     onPageChange: setStoredCurrentPage,
   });
+
+  // The full list skips SAP data; load instruction previews for the visible rows only.
+  const displayedProjectGroups = useSapInstructionPreviews(paginatedProjectGroups);
 
   const loading = userLoading || projectsLoading;
 
@@ -334,7 +338,7 @@ function ConcludedProjectsContent() {
       {/* Table or Card View */}
       {viewMode === "table" ? (
         <ConcludedTable
-          groups={paginatedProjectGroups}
+          groups={displayedProjectGroups}
           headerOffset={headerOffset}
           expandedGroups={expandedGroups}
           onToggleGroup={toggleGroup}
@@ -342,7 +346,7 @@ function ConcludedProjectsContent() {
         />
       ) : (
         <ConcludedCard
-          groups={paginatedProjectGroups}
+          groups={displayedProjectGroups}
           expandedGroups={expandedGroups}
           onToggleGroup={toggleGroup}
           onCardClick={handleRowClick}
