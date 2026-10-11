@@ -21,6 +21,20 @@ interface UseInstructionExclusionsResult {
   isRemoving: boolean;
 }
 
+/** Shared fetcher so other queries (e.g. project lists) can reuse the cached exclusions. */
+export async function fetchInstructionExclusions(
+  supabase: ReturnType<typeof useSupabase>
+): Promise<InstructionExclusionV2[]> {
+  const { data, error } = await supabase
+    .from("instruction_exclusions_v2")
+    .select("id, created_at, created_by, raw_text, normalized_text, is_active")
+    .eq("is_active", true)
+    .order("created_at", { ascending: false });
+
+  if (error) throw new Error(error.message);
+  return (data || []) as InstructionExclusionV2[];
+}
+
 export function useInstructionExclusions(currentUserId: string | null): UseInstructionExclusionsResult {
   const supabase = useSupabase();
   const queryClient = useQueryClient();
@@ -28,16 +42,7 @@ export function useInstructionExclusions(currentUserId: string | null): UseInstr
 
   const { data: exclusions = [], isLoading } = useQuery({
     queryKey,
-    queryFn: async (): Promise<InstructionExclusionV2[]> => {
-      const { data, error } = await supabase
-        .from("instruction_exclusions_v2")
-        .select("id, created_at, created_by, raw_text, normalized_text, is_active")
-        .eq("is_active", true)
-        .order("created_at", { ascending: false });
-
-      if (error) throw new Error(error.message);
-      return (data || []) as InstructionExclusionV2[];
-    },
+    queryFn: () => fetchInstructionExclusions(supabase),
   });
 
   const exclusionSet = useMemo(() => toInstructionExclusionSet(exclusions), [exclusions]);
@@ -108,6 +113,10 @@ export function useInstructionExclusions(currentUserId: string | null): UseInstr
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey });
+      // Project lists only carry the first visible SAP entry; a new exclusion may hide it,
+      // so refetch them to pick up the next visible entry.
+      queryClient.invalidateQueries({ queryKey: queryKeys.projectsWithTranslators() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.sapInstructionPreviews() });
     },
   });
 

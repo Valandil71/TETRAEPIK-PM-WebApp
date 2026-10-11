@@ -4,6 +4,7 @@ import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { X, Loader2, AlertCircle } from "lucide-react";
 import { useUser } from "@/hooks/user/useUser";
 import { useProjectsWithTranslators } from "@/hooks/project/useProjectsWithTranslators";
+import { useSapInstructionPreviews } from "@/hooks/project/useSapInstructionPreviews";
 import { useProjectFilters } from "@/hooks/project/useProjectFilters";
 import {
   PAST_DUE_DATE_OPTIONS,
@@ -106,7 +107,7 @@ function InvoicingContent() {
     data: projectsData = [],
     isLoading: projectsLoading,
     error: projectsError,
-  } = useProjectsWithTranslators(false, true, true);
+  } = useProjectsWithTranslators(false, true, "complete");
 
   // Filter to only show complete projects in invoicing
   const allProjectsRaw = useMemo(
@@ -239,6 +240,9 @@ function InvoicingContent() {
     currentPage: storedCurrentPage,
     onPageChange: setStoredCurrentPage,
   });
+
+  // The full list skips SAP data; load instruction previews for the visible rows only.
+  const displayedProjectGroups = useSapInstructionPreviews(paginatedProjectGroups);
 
   const loading = userLoading || projectsLoading;
 
@@ -663,7 +667,7 @@ function InvoicingContent() {
       {/* Table or Card View */}
       {viewMode === "table" ?
         <InvoicingTable
-          groups={paginatedProjectGroups}
+          groups={displayedProjectGroups}
           headerOffset={headerOffset}
           expandedGroups={expandedGroups}
           onToggleGroup={toggleGroup}
@@ -673,7 +677,7 @@ function InvoicingContent() {
           onGroupSelection={handleGroupSelection}
         />
       : <InvoicingCard
-          groups={paginatedProjectGroups}
+          groups={displayedProjectGroups}
           expandedGroups={expandedGroups}
           onToggleGroup={toggleGroup}
           selectedProjects={selectedProjects}

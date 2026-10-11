@@ -74,7 +74,11 @@ export interface ProjectTranslatorWithMessages extends ProjectTranslator {
   done_message?: string | null;
 }
 
-/** Project with basic translator info (for lists) */
+/**
+ * Project with basic translator info (for lists).
+ * `sap_instructions` is trimmed for lists: only what getInstructionsPreview needs, and null
+ * when manual `instructions` exist. Use useProjectInstructions for the full content.
+ */
 export interface ProjectWithTranslators extends Project {
   translators: ProjectTranslator[];
 }

@@ -126,7 +126,7 @@ describe('invalidateCollaboratorQueries', () => {
   it('invalidates lists, each project and each user\'s views', () => {
     const queryClient = new QueryClient();
     const keys = [
-      queryKeys.projectsWithTranslators(false, true, false),
+      queryKeys.projectsWithTranslators(false, true, "active"),
       queryKeys.project(1),
       queryKeys.project(2),
       queryKeys.myProjects('u1'),

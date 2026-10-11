@@ -37,7 +37,6 @@ import { useDefaultFilters } from "@/hooks/settings/useDefaultFilters";
 import { useProjectFilters } from "@/hooks/project/useProjectFilters";
 import { useManagementPageStore } from "@/lib/stores/useManagementPageStore";
 import { useLayoutStore } from "@/lib/stores/useLayoutStore";
-import type { SapInstructionEntry } from "@/types/project";
 import { groupProjectsForDisplay } from "@/lib/projectGrouping";
 import {
   addCollaborators,
@@ -198,7 +197,7 @@ function ProjectManagementContent() {
   // Instructions drawer state
   const [instructionsDrawer, setInstructionsDrawer] = useState<{
     open: boolean;
-    project: { name: string; instructions?: string | null; sap_instructions?: SapInstructionEntry[] | null } | null;
+    project: { id: number; name: string; instructions?: string | null } | null;
   }>({ open: false, project: null });
 
   // Fetch all projects (showAll = true to show all projects for all users)
@@ -878,7 +877,7 @@ function ProjectManagementContent() {
           onCancelWordsLinesEdit={handleCancelWordsLinesEdit}
           isUpdatingWordsLines={updateWordsLinesMutation.isPending}
           onInstructionsClick={(project) =>
-            setInstructionsDrawer({ open: true, project: { name: project.name, instructions: project.instructions, sap_instructions: project.sap_instructions } })
+            setInstructionsDrawer({ open: true, project: { id: project.id, name: project.name, instructions: project.instructions } })
           }
         />
       : <ManagementCard
@@ -906,7 +905,7 @@ function ProjectManagementContent() {
           onCancelWordsLinesEdit={handleCancelWordsLinesEdit}
           isUpdatingWordsLines={updateWordsLinesMutation.isPending}
           onInstructionsClick={(project) =>
-            setInstructionsDrawer({ open: true, project: { name: project.name, instructions: project.instructions, sap_instructions: project.sap_instructions } })
+            setInstructionsDrawer({ open: true, project: { id: project.id, name: project.name, instructions: project.instructions } })
           }
         />
       }

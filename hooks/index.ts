@@ -20,6 +20,7 @@ export { useUserWorkload } from './user/useUserWorkload';
 export { useProject } from './project/useProject';
 export { useMyProjects } from './project/useMyProjects';
 export { useProjectsWithTranslators } from './project/useProjectsWithTranslators';
+export { useProjectInstructions } from './project/useProjectInstructions';
 export { useProjectFilters } from './project/useProjectFilters';
 export { useProjectListPagination, PROJECT_LIST_ITEMS_PER_PAGE } from './project/useProjectListPagination';
 

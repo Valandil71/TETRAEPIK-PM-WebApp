@@ -13,6 +13,8 @@ import { useQueryClient, QueryClient } from "@tanstack/react-query";
 import { useSupabase } from "@/hooks/core/useSupabase";
 import { queryKeys } from "@/lib/queryKeys";
 import type { RealtimeChannel } from "@supabase/supabase-js";
+import type { Query } from "@tanstack/react-query";
+import type { ProjectWithTranslators } from "@/types/project";
 
 type BroadcastEvent = "INSERT" | "UPDATE" | "DELETE";
 
@@ -54,27 +56,74 @@ interface RealtimeProviderProps {
 
 // ─── Handlers (pure functions, no hooks) ─────────────────────────────────────
 
+/** Status a project list query is filtered by (see queryKeys.projectsWithTranslators). */
+function getListStatus(query: Query): unknown {
+  return query.queryKey[3];
+}
+
+/**
+ * Project lists are filtered by status, so a project change only affects the lists for its
+ * old and new status. Skipping the rest avoids refetching the ~2,000-row completed list on
+ * every change to an active project (and the active lists on invoicing updates).
+ * Unknown statuses (unexpected payload) refresh every list.
+ */
+export function invalidateProjectListsForStatuses(
+  queryClient: QueryClient,
+  statuses: unknown[]
+) {
+  const known = statuses.filter((status) => typeof status === "string");
+  const refreshAll = known.length === 0;
+  queryClient.invalidateQueries({
+    queryKey: queryKeys.projectsWithTranslators(),
+    predicate: (query) => refreshAll || known.includes(getListStatus(query) as string),
+  });
+}
+
+/**
+ * An assignment change only affects lists that contain its project. A list that has no data
+ * yet or is mid-fetch is refreshed too, since it may be about to include the project.
+ * Exported for tests.
+ */
+export function invalidateProjectListsForAssignment(
+  queryClient: QueryClient,
+  projectId: number | undefined
+) {
+  queryClient.invalidateQueries({
+    queryKey: queryKeys.projectsWithTranslators(),
+    predicate: (query) => {
+      if (projectId === undefined || query.state.fetchStatus === "fetching") return true;
+      const projects = query.state.data as ProjectWithTranslators[] | undefined;
+      return !projects || projects.some((project) => project.id === projectId);
+    },
+  });
+}
+
 function handleProjectsChange(
   queryClient: QueryClient,
   eventType: BroadcastEvent,
   newRecord: Record<string, unknown>,
   oldRecord: Record<string, unknown>
 ) {
+  const statuses = [newRecord?.status, oldRecord?.status];
+
   if (eventType === "INSERT" || eventType === "DELETE") {
-    queryClient.invalidateQueries({ queryKey: ["projects-with-translators"] });
+    invalidateProjectListsForStatuses(queryClient, statuses);
     queryClient.invalidateQueries({ queryKey: queryKeys.homeManageProjectsCount() });
   }
 
   if (eventType === "UPDATE" && newRecord?.id) {
     queryClient.invalidateQueries({ queryKey: queryKeys.project(newRecord.id as number) });
-    queryClient.invalidateQueries({ queryKey: ["projects-with-translators"] });
+    invalidateProjectListsForStatuses(queryClient, statuses);
+    // Instructions previews loaded per page (Concluded Projects, Invoicing)
+    if (statuses.includes("complete")) {
+      queryClient.invalidateQueries({ queryKey: queryKeys.sapInstructionPreviews() });
+    }
     // A status change (e.g. marked complete) changes the home "Manage Projects" count
     queryClient.invalidateQueries({ queryKey: queryKeys.homeManageProjectsCount() });
   }
 
   if (eventType === "DELETE" && oldRecord?.id) {
     queryClient.removeQueries({ queryKey: queryKeys.project(oldRecord.id as number) });
-    queryClient.invalidateQueries({ queryKey: ["projects-with-translators"] });
   }
 }
 
@@ -96,7 +145,7 @@ function handleAssignmentChange(
     queryClient.invalidateQueries({ queryKey: queryKeys.homeMyProjectsCount(userId) });
   }
 
-  queryClient.invalidateQueries({ queryKey: ["projects-with-translators"] });
+  invalidateProjectListsForAssignment(queryClient, projectId);
 
   // Always invalidate the current user's cache regardless of payload contents.
   if (currentUserId) {
