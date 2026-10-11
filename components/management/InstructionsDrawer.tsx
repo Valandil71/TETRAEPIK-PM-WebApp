@@ -8,15 +8,16 @@ import {
 } from "@/components/ui/sheet";
 import { FileText, ClipboardList, ChevronDown, ChevronRight, Ban } from "lucide-react";
 import { useState } from "react";
-import type { SapInstructionEntry } from "@/types/project";
 import { useInstructionExclusions } from "@/hooks/settings/useInstructionExclusions";
 import { filterSapInstructions } from "@/lib/sap/instruction-exclusions";
 import { useRoleAccess } from "@/hooks/user/useRoleAccess";
+import { useProjectInstructions } from "@/hooks/project/useProjectInstructions";
 
 interface InstructionsDrawerProject {
+  id: number;
   name: string;
+  /** Manual instructions from the list, shown while the full instructions load. */
   instructions?: string | null;
-  sap_instructions?: SapInstructionEntry[] | null;
 }
 
 interface InstructionsDrawerProps {
@@ -37,11 +38,15 @@ export function InstructionsDrawer({
     addExclusion,
     isAdding,
   } = useInstructionExclusions(user?.id ?? null);
+  // Project lists don't carry full SAP instructions, so load them when the drawer opens.
+  const { data: fullInstructions, isLoading: isLoadingInstructions } =
+    useProjectInstructions(open && project ? project.id : null);
 
   if (!project) return null;
 
-  const hasInstructions = project.instructions && project.instructions.trim() !== "";
-  const visibleSapInstructions = filterSapInstructions(project.sap_instructions, exclusionSet);
+  const instructions = fullInstructions ? fullInstructions.instructions : project.instructions;
+  const hasInstructions = instructions && instructions.trim() !== "";
+  const visibleSapInstructions = filterSapInstructions(fullInstructions?.sap_instructions, exclusionSet);
   const canExcludeSapInstructions = isPmOrAdmin() && !!user?.id;
 
   const handleExcludeSapInstruction = (text: string) => {
@@ -103,13 +108,19 @@ export function InstructionsDrawer({
               </div>
               <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 border border-gray-100 dark:border-gray-700">
                 <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-line break-words overflow-hidden">
-                  {project.instructions}
+                  {instructions}
                 </p>
               </div>
             </div>
           )}
 
-          {!hasInstructions && visibleSapInstructions.length === 0 && (
+          {isLoadingInstructions && (
+            <p className="text-sm text-gray-400 dark:text-gray-500 italic">
+              Loading SAP instructions...
+            </p>
+          )}
+
+          {!isLoadingInstructions && !hasInstructions && visibleSapInstructions.length === 0 && (
             <p className="text-sm text-gray-400 dark:text-gray-500 italic">
               No instructions available
             </p>

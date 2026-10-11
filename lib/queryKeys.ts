@@ -13,6 +13,8 @@ export const queryKeys = {
 
   // Project-related queries
   project: (id: number | string | null) => ['project', id] as const,
+  // Nested under project(id) so realtime project invalidations also refresh it.
+  projectInstructions: (id: number | null) => ['project', id, 'instructions'] as const,
   projects: () => ['projects'] as const,
   // Called without arguments it returns the prefix, so invalidating it refreshes every list variant.
   projectsWithTranslators: (showPast?: boolean, showAll?: boolean, includeAllStatuses?: boolean) =>
