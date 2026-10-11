@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { X, Clock, CheckCircle2, AlertTriangle, ChevronLeft, ChevronRight } from "lucide-react";
 import { formatNumber, formatRoleDisplay } from "@/utils/formatters";
 import { useUsers } from "@/hooks/user/useUsers";
+import { isHiddenTestAccount } from "@/lib/users/testAccounts";
 import { useUserWorkload } from "@/hooks/user/useUserWorkload";
 import { useLayoutStore } from "@/lib/stores/useLayoutStore";
 import type { Project } from "@/types/project";
@@ -130,9 +131,12 @@ export function TranslatorSelectionView({
     return assignedIds;
   }, [currentProject]);
 
-  // Filter out users who are already assigned to the current project
+  // Filter out users who are already assigned to the current project, and test accounts
+  // (shown on localhost only)
   const availableUsers = useMemo(() => {
-    return users.filter((user) => !assignedUserIds.has(user.id));
+    return users.filter(
+      (user) => !assignedUserIds.has(user.id) && !isHiddenTestAccount(user.name)
+    );
   }, [users, assignedUserIds]);
 
   // Count total translators assigned across all projects

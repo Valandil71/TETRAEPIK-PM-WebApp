@@ -5,6 +5,7 @@ import { useSupabase } from '@/hooks/core/useSupabase';
 import { toast } from "sonner";
 import type { ProjectAssignment } from "@/types/project-assignment";
 import { queryKeys } from "@/lib/queryKeys";
+import { notifyAssignmentsDone } from "@/lib/notifications/notify";
 
 export function useMyProjects(userId: string | null) {
   const supabase = useSupabase();
@@ -110,6 +111,7 @@ export function useMyProjects(userId: string | null) {
       };
 
       toast.success(messages[status]);
+      if (status === "done") notifyAssignmentsDone([projectId]);
 
       // Invalidate and refetch the projects queries
       queryClient.invalidateQueries({ queryKey: queryKeys.myProjects(userId) });

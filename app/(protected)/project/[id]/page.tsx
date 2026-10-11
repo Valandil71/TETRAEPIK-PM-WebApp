@@ -31,6 +31,7 @@ import {
   removeCollaborator,
 } from "@/lib/projects/collaborators";
 import { createStmProject } from "@/lib/projects/stm";
+import { notifyAssigned, notifyProjectsCompleted } from "@/lib/notifications/notify";
 
 export default function ProjectPage() {
   const params = useParams();
@@ -242,7 +243,8 @@ export default function ProjectPage() {
         throw new Error(`Failed to reassign: ${error.message}`);
       }
     },
-    onSuccess: (_, { userId }) => {
+    onSuccess: (_, { projectId: reassignedProjectId, userId }) => {
+      notifyAssigned([{ projectId: reassignedProjectId, userId }]);
       queryClient.invalidateQueries({ queryKey: queryKeys.project(projectId) });
       queryClient.invalidateQueries({ queryKey: ["projects-with-translators"] });
       queryClient.invalidateQueries({ queryKey: queryKeys.myProjects(userId) });
@@ -268,6 +270,7 @@ export default function ProjectPage() {
         throw new Error(`Failed to mark project as complete: ${error.message}`);
     },
     onSuccess: () => {
+      if (projectId) notifyProjectsCompleted([projectId]);
       queryClient.invalidateQueries({ queryKey: queryKeys.project(projectId) });
       queryClient.invalidateQueries({ queryKey: ["projects-with-translators"] });
       queryClient.invalidateQueries({ queryKey: queryKeys.homeManageProjectsCount() });

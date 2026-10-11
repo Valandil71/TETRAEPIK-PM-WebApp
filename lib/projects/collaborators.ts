@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { QueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/queryKeys";
+import { notifyAssigned } from "@/lib/notifications/notify";
 
 export interface CollaboratorAssignment {
   projectId: number;
@@ -31,7 +32,10 @@ export function buildAssignmentRows(
   }));
 }
 
-/** Assign collaborators to one or more projects in a single insert. */
+/**
+ * Assign collaborators to one or more projects in a single insert, then trigger one push
+ * request for the whole batch (each assignee gets a single notification).
+ */
 export async function addCollaborators(
   supabase: SupabaseClient,
   assignments: CollaboratorAssignment[],
@@ -45,6 +49,7 @@ export async function addCollaborators(
   const { error } = await supabase.from("projects_assignment").insert(rows);
   if (error) throw new Error(`Failed to add collaborators: ${error.message}`);
 
+  notifyAssigned(rows.map((r) => ({ projectId: r.project_id, userId: r.user_id })));
   return rows;
 }
 

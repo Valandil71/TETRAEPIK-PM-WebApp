@@ -7,6 +7,7 @@ import { useUserWorkload } from "@/hooks/user/useUserWorkload";
 import type { User } from "@/types/user";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { formatRoleDisplay } from "@/utils/formatters";
+import { isHiddenTestAccount } from "@/lib/users/testAccounts";
 import {
   Dialog,
   DialogContent,
@@ -23,9 +24,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-
-/** Test accounts that should never be offered for project assignment */
-const HIDDEN_USER_NAMES = ["Francisco Rodrigues", "Xiconi das Coves"];
 
 /** Display order of roles in the selection grid */
 const ROLE_ORDER = ["employee", "pm", "admin"];
@@ -83,18 +81,9 @@ export function AddTranslatorDialog({
     return false;
   }, [assignedTranslatorIds, liveAssignedTranslatorIds]);
 
-  // Filter out already assigned translators and test accounts, then sort by
+  // Filter out already assigned translators and test accounts (shown on localhost only), then sort by
   // role (Collaborators, PMs, Admins) and, within each role, lowest workload first
   const availableUsers = useMemo(() => {
-    const normalize = (name: string) =>
-      name
-        .normalize("NFD")
-        .replace(/[̀-ͯ]/g, "")
-        .trim()
-        .toLowerCase();
-    const hiddenNames = new Set(
-      HIDDEN_USER_NAMES.map((name) => normalize(name))
-    );
     const roleOrder = (role: string) => {
       const index = ROLE_ORDER.indexOf(role);
       return index === -1 ? ROLE_ORDER.length : index;
@@ -105,7 +94,7 @@ export function AddTranslatorDialog({
       .filter(
         (user) =>
           !assignedTranslatorIds.includes(user.id) &&
-          !hiddenNames.has(normalize(user.name))
+          !isHiddenTestAccount(user.name)
       )
       .sort(
         (a, b) =>

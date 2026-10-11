@@ -11,6 +11,8 @@ import { GroupExpansionSettings } from "@/components/settings/GroupExpansionSett
 import { UserRoleManagement } from "@/components/settings/UserRoleManagement";
 import { InstructionExclusionSettings } from "@/components/settings/InstructionExclusionSettings";
 import { DefaultFilterSettings } from "@/components/settings/DefaultFilterSettings";
+import { NotificationFilterSettings } from "@/components/settings/NotificationFilterSettings";
+import { removePushSubscription } from "@/lib/notifications/pushClient";
 import { useRoleAccess } from "@/hooks/user/useRoleAccess";
 import { createBrowserClient } from "@supabase/ssr";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -58,6 +60,10 @@ export default function SettingsPage() {
   const handleLogout = async () => {
     setLoggingOut(true);
     try {
+      // While still signed in: stop this browser from getting this user's notifications.
+      await removePushSubscription(supabase).catch((error) =>
+        console.warn("Failed to remove push subscription:", error)
+      );
       const { error } = await supabase.auth.signOut();
       if (error) {
         toast.error("Failed to logout");
@@ -99,15 +105,7 @@ export default function SettingsPage() {
       <Card className="p-6 text-left">
         <ThemeSettings />
       </Card>
-      <Card className="p-6 text-left">
-        <GroupExpansionSettings />
-      </Card>
-      {/* Only show ColorSettings card for admins */}
-      {canEditColors() && (
-        <Card className="p-6">
-          <ColorSettings userRole={user.role} />
-        </Card>
-      )}
+      
 
       {/* User Role Management - Only for admins */}
       {user.role === "admin" && (
@@ -115,6 +113,10 @@ export default function SettingsPage() {
           <UserRoleManagement />
         </Card>
       )}
+
+      <Card className="p-6 text-left">
+        <GroupExpansionSettings />
+      </Card>
 
       {/* Instruction Exclusions - PM/Admin only */}
       {isPmOrAdmin && (
@@ -127,6 +129,21 @@ export default function SettingsPage() {
           userId={user.id}
           availableProjectTypes={projectTypes}
         />
+      )}
+
+      {/* Notification Project Type Filter - PM/Admin only */}
+      {isPmOrAdmin && (
+        <NotificationFilterSettings
+          userId={user.id}
+          availableProjectTypes={projectTypes}
+        />
+      )}
+
+      {/* Only show ColorSettings card for admins */}
+      {canEditColors() && (
+        <Card className="p-6">
+          <ColorSettings userRole={user.role} />
+        </Card>
       )}
 
       {/* Logout Section */}

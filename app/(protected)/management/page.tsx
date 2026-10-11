@@ -49,6 +49,7 @@ import { useProjectGroupExpansion } from "@/hooks/project/useProjectGroupExpansi
 import { useProjectListPagination } from "@/hooks/project/useProjectListPagination";
 import { useWindowScrollMemory } from "@/hooks/ui/useWindowScrollMemory";
 import { useStickyHeaderOffset } from "@/hooks/ui/useStickyHeaderOffset";
+import { notifyProjectsCompleted } from "@/lib/notifications/notify";
 import {
   restoreElementIntoView,
   restoreWindowScrollY,
@@ -406,6 +407,7 @@ function ProjectManagementContent() {
         throw new Error(`Failed to mark project as complete: ${error.message}`);
     },
     onSuccess: (_, projectId) => {
+      notifyProjectsCompleted([projectId]);
       queryClient.invalidateQueries({
         queryKey: queryKeys.projectsWithTranslators(),
       });

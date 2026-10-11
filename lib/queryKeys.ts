@@ -40,4 +40,5 @@ export const queryKeys = {
   // User settings
   instructionExclusions: () => ['instruction-exclusions-v2'] as const,
   defaultFilters: (userId: string | null) => ['default-filters', userId] as const,
+  notificationPreferences: (userId: string | null) => ['notification-preferences', userId] as const,
 } as const;

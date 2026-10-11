@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { QueryClient } from '@tanstack/react-query';
 import {
@@ -8,6 +8,9 @@ import {
   removeCollaborator,
 } from '@/lib/projects/collaborators';
 import { queryKeys } from '@/lib/queryKeys';
+import { notifyAssigned } from '@/lib/notifications/notify';
+
+vi.mock('@/lib/notifications/notify', () => ({ notifyAssigned: vi.fn() }));
 
 describe('buildAssignmentRows', () => {
   it('claims the current user\'s own assignment and leaves others unclaimed', () => {
@@ -33,6 +36,8 @@ describe('buildAssignmentRows', () => {
 });
 
 describe('addCollaborators', () => {
+  beforeEach(() => vi.mocked(notifyAssigned).mockClear());
+
   function mockInsert(result: { error: unknown }) {
     const insert = vi.fn().mockResolvedValue(result);
     const from = vi.fn().mockReturnValue({ insert });
@@ -52,6 +57,21 @@ describe('addCollaborators', () => {
     expect(rows.map((r) => r.assignment_status)).toEqual(['claimed', 'unclaimed']);
   });
 
+  it('sends one notification request for the whole batch after inserting', async () => {
+    const { supabase } = mockInsert({ error: null });
+    await addCollaborators(
+      supabase,
+      [{ projectId: 1, userId: 'a' }, { projectId: 2, userId: 'b' }, { projectId: 3, userId: 'b' }],
+      'a'
+    );
+    expect(notifyAssigned).toHaveBeenCalledTimes(1);
+    expect(notifyAssigned).toHaveBeenCalledWith([
+      { projectId: 1, userId: 'a' },
+      { projectId: 2, userId: 'b' },
+      { projectId: 3, userId: 'b' },
+    ]);
+  });
+
   it('rejects an empty selection without calling the database', async () => {
     const { supabase, insert } = mockInsert({ error: null });
     await expect(addCollaborators(supabase, [], 'a')).rejects.toThrow('No collaborators selected');
@@ -63,6 +83,7 @@ describe('addCollaborators', () => {
     await expect(addCollaborators(supabase, [{ projectId: 1, userId: 'a' }], null)).rejects.toThrow(
       'Failed to add collaborators: duplicate key'
     );
+    expect(notifyAssigned).not.toHaveBeenCalled();
   });
 });
 

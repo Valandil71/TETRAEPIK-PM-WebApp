@@ -58,6 +58,19 @@
   }
 }
 
+/*
+ * Laptop screens: a 15" 1920x1080 panel at Windows' 125–150% scaling gives the browser only
+ * ~1280–1536 CSS px, so the UI looks too zoomed in. Shrinking the root font size scales every
+ * rem-based size (text, spacing, widths) to 90%, the same as browser zoom at 90%. Large
+ * monitors (>= 1800px) and phones/tablets (< 1024px) keep 100%. A percentage keeps the user's
+ * browser font-size setting working, in every browser.
+ */
+@media (min-width: 1024px) and (max-width: 1799.98px) {
+  html {
+    font-size: 90%;
+  }
+}
+
 /* Soften extreme utility backgrounds globally */
 .bg-white {
   background-color: hsl(0 0% 98%) !important;

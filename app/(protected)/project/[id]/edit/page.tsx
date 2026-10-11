@@ -43,6 +43,7 @@ import { dateInputToTimestamp, toDateInputValue } from "@/lib/date-utils";
 import { RoleGuard } from "@/components/auth/RoleGuard";
 import { RouteId } from "@/lib/roleAccess";
 import { useRoleAccess } from "@/hooks/user/useRoleAccess";
+import { notifyProjectsCompleted } from "@/lib/notifications/notify";
 import {
   addCollaborators,
   invalidateCollaboratorQueries,
@@ -505,8 +506,12 @@ function EditProjectContent() {
       if (error) {
         throw new Error(`Failed to update project: ${error.message}`);
       }
+
+      // Every save writes status, so only a real transition counts as "completed".
+      return { becameComplete: project?.status !== "complete" && values.status === "complete" };
     },
-    onSuccess: (_, values) => {
+    onSuccess: ({ becameComplete }, values) => {
+      if (becameComplete && projectId) notifyProjectsCompleted([projectId]);
       queryClient.invalidateQueries({ queryKey: queryKeys.project(projectId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.projects() });
       queryClient.invalidateQueries({ queryKey: queryKeys.projectsWithTranslators() });

@@ -73,7 +73,8 @@ export async function proxy(req: NextRequest) {
 // Define which routes middleware applies to
 export const config = {
   matcher: [
-    // Protect all routes except static files and API routes
-    "/((?!_next/static|_next/image|favicon.ico|api).*)",
+    // Protect all routes except static files, icons (needed on the login page too), API routes
+    // and the push service worker (browsers reject a redirected service worker script)
+    "/((?!_next/static|_next/image|favicon.ico|icon.svg|icon-192.png|apple-touch-icon.png|sw.js|api).*)",
   ],
 };
