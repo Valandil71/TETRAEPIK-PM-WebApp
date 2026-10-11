@@ -11,6 +11,9 @@ import { findExistingProject, updateProjectFromSap, insertProjectFromSap } from 
 import { createImportReport, type ImportReportWarning, type NewProjectReport } from './report-writer';
 import type { ModifiedReportEntry } from './sync-utils';
 import { isBlockedSapProjectType } from './project-type-rules';
+// ONE-TIME-USE:BEGIN
+import { migrateLegacyDeadlineSplits } from './one-time/deadline-split-migration';
+// ONE-TIME-USE:END
 
 export interface ManualImportParams {
   supabase: SupabaseClient;
@@ -96,7 +99,26 @@ export async function runManualImport(params: ManualImportParams): Promise<Manua
         instructionsData.instructions
       ));
 
+      // ONE-TIME-USE:BEGIN
+      const splitMigration = await migrateLegacyDeadlineSplits({
+        supabase,
+        projects: importProjects,
+        includeSapInstructions: !instructionsUnavailable,
+      });
+      imported += splitMigration.imported;
+      hadSuccessfulSync ||= splitMigration.hadSuccessfulSync;
+      reportNewProjects.push(...splitMigration.newProjects);
+      reportModifiedProjects.push(...splitMigration.modifiedProjects);
+      for (const failure of splitMigration.failures) {
+        failures.record(failure.stage, failure.message, projectId, subProjectId);
+      }
+      // ONE-TIME-USE:END
+
       for (const importData of importProjects) {
+        // ONE-TIME-USE:BEGIN
+        if (splitMigration.handledKeys.has(importData.sap_import_key)) continue;
+        // ONE-TIME-USE:END
+
         const sanitizedData = sanitizeImportData(importData);
 
         const { data: existing, error: matchError } = await findExistingProject(supabase, sanitizedData);

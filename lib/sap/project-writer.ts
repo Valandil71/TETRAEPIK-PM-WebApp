@@ -107,9 +107,9 @@ export async function findExistingProject(
   const deadlineVariant = getDeadlineVariantFromImportKey(data.sap_import_key);
 
   if (deadlineVariant === null) {
-    // Projects whose initial deadline comes from finalVolumeAvailableOn are no longer split in
-    // INITIAL/FINAL rows. An earlier import may have renamed the existing row to its FINAL key,
-    // so reuse it: it then gets both deadlines and the unsplit key back.
+    // Unsplit key = project with a single deadline. If it previously had both deadlines, its row
+    // was saved under the FINAL key, so reuse it instead of falling through to the fuzzy fallbacks
+    // (which could pick the INITIAL row).
     const finalVariantMatch = await supabase
       .from('projects')
       .select('id')

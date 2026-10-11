@@ -69,7 +69,7 @@ There are also fallback matches for older imported rows that did not yet have `s
 | Blocked project type | Returns no projects |
 | Language pairs | Usually one local project per source/target language pair |
 | SSE/SSK/SSH | One local project per language pair and translation area |
-| Initial + final deadlines | Splits into two local projects: one initial, one final |
+| Initial + final deadlines | Always splits into two local projects (key suffix `\|DEADLINE\|INITIAL` / `\|DEADLINE\|FINAL`), including when the initial deadline comes from `finalVolumeAvailableOn`. Each row carries only its own deadline; words/lines/hours are copied to both |
 | Past deadlines | Skips a generated project when all its deadlines are before today |
 | XTM words | Stores words as a binary `0` or `1` presence flag |
 

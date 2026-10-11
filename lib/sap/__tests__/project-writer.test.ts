@@ -110,7 +110,7 @@ describe('findExistingProject', () => {
     expect(result.data).toEqual({ id: 20 });
   });
 
-  it('matches an unsplit project to the row previously saved with the FINAL deadline key', async () => {
+  it('matches a single-deadline project to the row previously saved with the FINAL deadline key', async () => {
     const supabase = createSupabaseSequenceMock([
       { data: null, error: null }, // exact maybeSingle
       { data: { id: 30 }, error: null }, // FINAL variant key maybeSingle
@@ -119,7 +119,6 @@ describe('findExistingProject', () => {
     const result = await findExistingProject(supabase as never, {
       ...baseData,
       sap_import_key: 'k1',
-      initial_deadline: '2026-09-30T06:00:00.000Z',
       final_deadline: '2026-09-30T12:00:00.000Z',
     });
 

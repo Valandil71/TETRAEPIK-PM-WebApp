@@ -319,7 +319,7 @@ describe('mapSapSubProjectToProjects', () => {
     };
   }
 
-  it('keeps initial (finalVolumeAvailableOn) and final deadline together in one project', () => {
+  it('splits initial (finalVolumeAvailableOn) and final deadline into two projects', () => {
     const details: SapSubProjectInfo = {
       subProjectId: '5983-293',
       subProjectName: 'S4H_2026CW40',
@@ -348,14 +348,23 @@ describe('mapSapSubProjectToProjects', () => {
       []
     );
 
-    expect(projects).toHaveLength(1);
-    expect(projects[0].sap_import_key).toBe('STD|B0X|enUS|ptBR|LANGPAIR');
-    expect(projects[0].initial_deadline).toBe('2026-09-30T06:00:00.000Z');
-    expect(projects[0].final_deadline).toBe('2026-09-30T12:00:00.000Z');
-    expect(projects[0].words).toBe(51);
+    expect(projects).toHaveLength(2);
+
+    const finalProject = projects.find((project) => project.final_deadline);
+    const initialProject = projects.find((project) => project.initial_deadline);
+
+    expect(finalProject?.sap_import_key).toBe('STD|B0X|enUS|ptBR|LANGPAIR|DEADLINE|FINAL');
+    expect(finalProject?.initial_deadline).toBeNull();
+    expect(finalProject?.final_deadline).toBe('2026-09-30T12:00:00.000Z');
+    expect(finalProject?.words).toBe(51);
+
+    expect(initialProject?.sap_import_key).toBe('STD|B0X|enUS|ptBR|LANGPAIR|DEADLINE|INITIAL');
+    expect(initialProject?.initial_deadline).toBe('2026-09-30T06:00:00.000Z');
+    expect(initialProject?.final_deadline).toBeNull();
+    expect(initialProject?.words).toBe(51);
   });
 
-  it('keeps both deadlines together per translation area for SSE when using finalVolumeAvailableOn', () => {
+  it('splits deadlines per translation area for SSE when using finalVolumeAvailableOn', () => {
     const details: SapSubProjectInfo = {
       subProjectId: '5164-192',
       subProjectName: 'Bi-Weekly_UI_2026CW40',
@@ -381,9 +390,17 @@ describe('mapSapSubProjectToProjects', () => {
       []
     );
 
-    expect(projects).toHaveLength(1);
-    expect(projects[0].sap_import_key).toBe('STD|SSE|enUS|ptBR|TA|CHR000');
-    expect(projects[0].initial_deadline).toBe('2026-10-06T22:00:00.000Z');
-    expect(projects[0].final_deadline).toBe('2026-10-08T12:00:00.000Z');
+    expect(projects).toHaveLength(2);
+
+    const finalProject = projects.find((project) => project.final_deadline);
+    const initialProject = projects.find((project) => project.initial_deadline);
+
+    expect(finalProject?.sap_import_key).toBe('STD|SSE|enUS|ptBR|TA|CHR000|DEADLINE|FINAL');
+    expect(finalProject?.initial_deadline).toBeNull();
+    expect(finalProject?.final_deadline).toBe('2026-10-08T12:00:00.000Z');
+
+    expect(initialProject?.sap_import_key).toBe('STD|SSE|enUS|ptBR|TA|CHR000|DEADLINE|INITIAL');
+    expect(initialProject?.initial_deadline).toBe('2026-10-06T22:00:00.000Z');
+    expect(initialProject?.final_deadline).toBeNull();
   });
 });
