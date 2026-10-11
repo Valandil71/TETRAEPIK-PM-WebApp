@@ -68,6 +68,8 @@ function handleProjectsChange(
   if (eventType === "UPDATE" && newRecord?.id) {
     queryClient.invalidateQueries({ queryKey: queryKeys.project(newRecord.id as number) });
     queryClient.invalidateQueries({ queryKey: ["projects-with-translators"] });
+    // A status change (e.g. marked complete) changes the home "Manage Projects" count
+    queryClient.invalidateQueries({ queryKey: queryKeys.homeManageProjectsCount() });
   }
 
   if (eventType === "DELETE" && oldRecord?.id) {

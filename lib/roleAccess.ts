@@ -7,6 +7,7 @@ export const RouteId = {
   PROFILE: "profile",
   SETTINGS: "settings",
   PROJECT: "project",
+  PROJECT_EDIT: "project-edit",
   ASSIGN_PROJECTS: "assign-projects",
   MANAGEMENT: "management",
   CONCLUDED_PROJECTS: "concluded-projects",
@@ -24,6 +25,7 @@ const routeAccessMap: Record<RouteIdType, UserRole[]> = {
   [RouteId.PROFILE]: ["employee", "pm", "admin"],
   [RouteId.SETTINGS]: ["employee", "pm", "admin"],
   [RouteId.PROJECT]: ["employee", "pm", "admin"], // Translators have additional assignment check
+  [RouteId.PROJECT_EDIT]: ["pm", "admin"],
   [RouteId.ASSIGN_PROJECTS]: ["pm", "admin"],
   [RouteId.MANAGEMENT]: ["pm", "admin"],
   [RouteId.CONCLUDED_PROJECTS]: ["pm", "admin"],

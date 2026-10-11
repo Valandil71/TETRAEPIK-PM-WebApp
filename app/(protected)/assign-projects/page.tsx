@@ -19,6 +19,10 @@ import { RouteId } from "@/lib/roleAccess";
 import { useProjectsWithTranslators } from "@/hooks/project/useProjectsWithTranslators";
 import { useProjectFilters } from "@/hooks/project/useProjectFilters";
 import { createBrowserClient } from "@supabase/ssr";
+import {
+  addCollaborators,
+  invalidateCollaboratorQueries,
+} from "@/lib/projects/collaborators";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/queryKeys";
 import { toast } from "sonner";
@@ -298,45 +302,27 @@ function AssignProjectsContent() {
       assignments: Map<number, ProjectAssignmentData>;
     }) => {
       // Create assignments for each project with its specific translators
-      const dbAssignments: Array<{
-        project_id: number;
-        user_id: string;
-        assignment_status: string;
-        initial_message: string | null;
-      }> = [];
-
-      assignments.forEach((data, projectId) => {
-        data.translatorIds.forEach((translatorId) => {
-          dbAssignments.push({
-            project_id: projectId,
-            user_id: translatorId,
-            assignment_status: translatorId === user?.id ? "claimed" : "unclaimed",
-            initial_message: data.messages[translatorId] || null,
-          });
-        });
-      });
-
-      if (dbAssignments.length === 0) {
-        throw new Error("No assignments to create");
-      }
-
-      const { error } = await supabase
-        .from("projects_assignment")
-        .insert(dbAssignments);
-
-      if (error) {
-        throw new Error(`Failed to assign projects: ${error.message}`);
-      }
+      const rows = await addCollaborators(
+        supabase,
+        Array.from(assignments, ([projectId, data]) =>
+          Array.from(data.translatorIds, (userId) => ({
+            projectId,
+            userId,
+            message: data.messages[userId],
+          }))
+        ).flat(),
+        user?.id
+      );
 
       return {
         projectCount: assignments.size,
-        assignmentCount: dbAssignments.length,
+        assignmentCount: rows.length,
+        projectIds: rows.map((row) => row.project_id),
+        userIds: rows.map((row) => row.user_id),
       };
     },
     onSuccess: (result) => {
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.projectsWithTranslators(),
-      });
+      invalidateCollaboratorQueries(queryClient, result.projectIds, result.userIds);
       queryClient.invalidateQueries({ queryKey: queryKeys.projects() });
       toast.success(
         `Successfully created ${result.assignmentCount} assignment${result.assignmentCount !== 1 ? "s" : ""} across ${result.projectCount} project${result.projectCount !== 1 ? "s" : ""}.`
