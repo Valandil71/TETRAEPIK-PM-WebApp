@@ -44,15 +44,22 @@ export interface ProjectSelection {
   isSelected: (id: number) => boolean;
   /** Enters selection mode with `id` selected (adds it if already selecting). */
   start: (id: number) => void;
+  /** Leaves selection mode (after an action completed). */
   exit: () => void;
+  /** Leaves selection mode because the user gave up (Cancel button, Esc): also runs onCancel. */
+  cancel: () => void;
   setMany: (ids: number[], selected: boolean) => void;
   retain: (visibleIds: Iterable<number>) => void;
   /** Click toggles; press and drag applies the first item's mode to every item the pointer enters. */
   getItemProps: (id: number) => SelectableItemProps;
 }
 
-export function useProjectSelection(): ProjectSelection {
+export function useProjectSelection(options: { onCancel?: () => void } = {}): ProjectSelection {
   const [isActive, setIsActive] = useState(false);
+  const onCancelRef = useRef(options.onCancel);
+  useEffect(() => {
+    onCancelRef.current = options.onCancel;
+  });
   const [selectedIds, setSelectedIds] = useState<Set<number>>(() => new Set());
   const dragModeRef = useRef<DragMode | null>(null);
   const selectedRef = useRef(selectedIds);
@@ -66,6 +73,11 @@ export function useProjectSelection(): ProjectSelection {
     setIsActive(false);
     setSelectedIds(new Set());
   }, []);
+
+  const cancel = useCallback(() => {
+    exit();
+    onCancelRef.current?.();
+  }, [exit]);
 
   const start = useCallback(
     (id: number) => {
@@ -91,7 +103,7 @@ export function useProjectSelection(): ProjectSelection {
       dragModeRef.current = null;
     };
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !document.querySelector("[role='dialog'], [role='menu']")) exit();
+      if (e.key === "Escape" && !document.querySelector("[role='dialog'], [role='menu']")) cancel();
     };
     window.addEventListener("pointerup", endDrag);
     window.addEventListener("pointercancel", endDrag);
@@ -101,7 +113,7 @@ export function useProjectSelection(): ProjectSelection {
       window.removeEventListener("pointercancel", endDrag);
       window.removeEventListener("keydown", onKeyDown);
     };
-  }, [isActive, exit]);
+  }, [isActive, cancel]);
 
   const getItemProps = useCallback(
     (id: number): SelectableItemProps => ({
@@ -131,10 +143,11 @@ export function useProjectSelection(): ProjectSelection {
       isSelected: (id: number) => selectedIds.has(id),
       start,
       exit,
+      cancel,
       setMany,
       retain,
       getItemProps,
     }),
-    [isActive, selectedIds, start, exit, setMany, retain, getItemProps]
+    [isActive, selectedIds, start, exit, cancel, setMany, retain, getItemProps]
   );
 }

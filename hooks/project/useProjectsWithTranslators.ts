@@ -88,7 +88,8 @@ async function fetchProjectListRows(
 }
 
 /**
- * @param status "active" for the working lists; "complete" for Concluded Projects and
+ * @param status "active" for the working lists ("pending_review" for projects still to be
+ * reviewed in Manage Projects); "complete" for Concluded Projects and
  * Invoicing. Complete lists hold ~2,000 rows, so they skip SAP previews here and the
  * pages load them for the visible rows only (useSapInstructionPreviews).
  */
@@ -110,8 +111,9 @@ export function useProjectsWithTranslators(
         return [];
       }
 
+      // Working lists (not the ~2,000-row complete list) load their SAP previews up front
       const sapPreviews =
-        status === "active" ?
+        status !== "complete" ?
           await loadSapInstructionPreviews(supabase, queryClient, getBlankInstructionIds(typedProjects))
         : new Map();
 

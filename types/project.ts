@@ -1,7 +1,11 @@
 // /types/project.ts
 import type { ApiSource } from './sap';
 
-export type ProjectStatus = "complete" | "active" | "cancelled" /* | "pending" */;
+/**
+ * "pending_review": imported from SAP without lines/words; a PM must review it before it is
+ * assigned (Manage Projects → To Review), which moves it to "active".
+ */
+export type ProjectStatus = "complete" | "active" | "cancelled" | "pending_review";
 
 export type AssignmentStatus = "unclaimed" | "claimed" | "done" | "rejected";
 

@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { X, Loader2, AlertCircle, Download, FileDown, UserPlus, CheckCircle } from "lucide-react";
+import { X, Loader2, AlertCircle, Download, FileDown, UserPlus, CheckCircle, ClipboardCheck } from "lucide-react";
 import { useUser } from "@/hooks/user/useUser";
 import { useProjectsWithTranslators } from "@/hooks/project/useProjectsWithTranslators";
 import {
@@ -37,7 +37,11 @@ import { useDefaultFilters } from "@/hooks/settings/useDefaultFilters";
 import { useProjectFilters } from "@/hooks/project/useProjectFilters";
 import { useManagementPageStore } from "@/lib/stores/useManagementPageStore";
 import { useLayoutStore } from "@/lib/stores/useLayoutStore";
-import { groupProjectsForDisplay } from "@/lib/projectGrouping";
+import { compareProjectsByClosestDeadline, groupProjectsForDisplay } from "@/lib/projectGrouping";
+import { categorizeManagementProjects } from "@/lib/projects/managementTabs";
+import { markProjectsReviewed } from "@/lib/projects/reviewStatus";
+import { MarkReviewedDialog } from "@/components/management/MarkReviewedDialog";
+import { ProjectNameList } from "@/components/management/ProjectNameList";
 import {
   addCollaborators,
   buildBulkAssignments,
@@ -46,7 +50,6 @@ import {
 } from "@/lib/projects/collaborators";
 import { useProjectSelection } from "@/hooks/project/useProjectSelection";
 import { BulkSelectionBar } from "@/components/shared/BulkSelectionBar";
-import { formatProjectName } from "@/utils/formatters";
 import { createStmProject } from "@/lib/projects/stm";
 import { useProjectGroupExpansion } from "@/hooks/project/useProjectGroupExpansion";
 import { useProjectListPagination } from "@/hooks/project/useProjectListPagination";
@@ -57,8 +60,6 @@ import {
   restoreElementIntoView,
   restoreWindowScrollY,
 } from "@/utils/scrollRestoration";
-
-type ProjectStatus = "all" | "ready" | "inProgress" | "unclaimed";
 
 export default function ProjectManagementPage() {
   return (
@@ -158,8 +159,30 @@ function ProjectManagementContent() {
   }>({ open: false, projectIds: [] });
 
   // Multi-select mode (bulk assign / complete)
-  const selection = useProjectSelection();
+  // "Select more" from a popup remembers it, so cancelling the selection brings that popup back
+  const selectMoreReturn = useRef<{ kind: "review" | "complete"; projectIds: number[] } | null>(
+    null
+  );
+  const selection = useProjectSelection({
+    onCancel: () => {
+      const popup = selectMoreReturn.current;
+      selectMoreReturn.current = null;
+      if (popup?.kind === "review") setReviewDialog({ open: true, projectIds: popup.projectIds });
+      if (popup?.kind === "complete") {
+        setCompleteConfirmModal({ open: true, projectIds: popup.projectIds });
+      }
+    },
+  });
   const [bulkAddTranslatorOpen, setBulkAddTranslatorOpen] = useState(false);
+
+  // "Mark as reviewed" popup, and the "Add translator" opened from it: the projects are only
+  // marked reviewed once the assignment is confirmed; closing it brings the popup back.
+  const [reviewDialog, setReviewDialog] = useState<{ open: boolean; projectIds: number[] }>({
+    open: false,
+    projectIds: [],
+  });
+  const [reviewAssignIds, setReviewAssignIds] = useState<number[] | null>(null);
+  const reviewAssignSubmitted = useRef(false);
 
   // SAP Import dialog state
   const [sapImportDialogOpen, setSapImportDialogOpen] = useState(false);
@@ -207,17 +230,25 @@ function ProjectManagementContent() {
     project: { id: number; name: string; instructions?: string | null } | null;
   }>({ open: false, project: null });
 
-  // Fetch all projects (showAll = true to show all projects for all users)
+  // Fetch all projects (showAll = true to show all projects for all users): the active ones and
+  // the ones still to be reviewed (imported from SAP without lines/words).
   const {
-    data: allProjectsRaw = [],
-    isLoading: projectsLoading,
-    error: projectsError,
+    data: activeProjects = [],
+    isLoading: activeLoading,
+    error: activeError,
   } = useProjectsWithTranslators(false, true);
+  const {
+    data: toReviewProjects = [],
+    isLoading: toReviewLoading,
+    error: toReviewError,
+  } = useProjectsWithTranslators(false, true, "pending_review");
+  const projectsLoading = activeLoading || toReviewLoading;
+  const projectsError = activeError ?? toReviewError;
 
-  // Filter out complete projects immediately
+  // One list, closest deadline first (each query is already sorted that way)
   const allProjects = useMemo(
-    () => allProjectsRaw.filter((p) => p.status !== "complete"),
-    [allProjectsRaw]
+    () => [...activeProjects, ...toReviewProjects].sort(compareProjectsByClosestDeadline),
+    [activeProjects, toReviewProjects]
   );
 
   // Shared filter state + logic
@@ -242,39 +273,11 @@ function ProjectManagementContent() {
     onFiltersChange: setStoredFilters,
   });
 
-  // Determine project status based on translators
-  const getProjectStatus = useCallback((
-    project: (typeof allProjects)[0]
-  ): ProjectStatus => {
-    if (project.translators.length === 0) return "unclaimed";
-    const allDone = project.translators.every(
-      (t) => t.assignment_status === "done"
-    );
-    if (allDone) return "ready";
-    const hasClaimed = project.translators.some(
-      (t) => t.assignment_status === "claimed"
-    );
-    if (hasClaimed) return "inProgress";
-    return "unclaimed";
-  }, []);
-
-
-
-  // Categorize projects
-  const categorizedProjects = useMemo(() => {
-    const ready: typeof allProjects = [];
-    const inProgress: typeof allProjects = [];
-    const unclaimed: typeof allProjects = [];
-
-    allProjects.forEach((project) => {
-      const status = getProjectStatus(project);
-      if (status === "ready") ready.push(project);
-      else if (status === "inProgress") inProgress.push(project);
-      else if (status === "unclaimed") unclaimed.push(project);
-    });
-
-    return { ready, inProgress, unclaimed };
-  }, [allProjects, getProjectStatus]);
+  // Split into tabs: To Review, or by collaborator progress (lib/projects/managementTabs)
+  const categorizedProjects = useMemo(
+    () => categorizeManagementProjects(allProjects),
+    [allProjects]
+  );
 
   // Create tabs
   const tabs = useMemo(
@@ -299,6 +302,11 @@ function ProjectManagementContent() {
         label: "Awaiting Assignment",
         count: categorizedProjects.unclaimed.length,
       },
+      {
+        id: "toReview" as const,
+        label: "To Review",
+        count: categorizedProjects.toReview.length,
+      },
     ],
     [allProjects, categorizedProjects]
   );
@@ -306,14 +314,8 @@ function ProjectManagementContent() {
   // Filter projects: tab filter + page-specific projectType on top of shared base filters
   const filteredProjects = useMemo(() => {
     // Start with tab filter
-    let projects = [...allProjects];
-    if (activeTab !== "all") {
-      const status =
-        activeTab === "ready" ? categorizedProjects.ready
-        : activeTab === "inProgress" ? categorizedProjects.inProgress
-        : categorizedProjects.unclaimed;
-      projects = projects.filter((p) => status.includes(p));
-    }
+    let projects =
+      activeTab === "all" ? [...allProjects] : [...categorizedProjects[activeTab]];
 
     // Apply shared base filters (search, system, dueDate, assignment, langs, length)
     projects = applyBaseFilters(projects);
@@ -475,16 +477,43 @@ function ProjectManagementContent() {
       toast.error(getUserFriendlyError(error, "project management")),
   });
 
+  const invalidateReviewedProjects = (projectIds: number[]) => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.projectsWithTranslators() });
+    projectIds.forEach((projectId) =>
+      queryClient.invalidateQueries({ queryKey: queryKeys.project(projectId) })
+    );
+  };
+
+  const markReviewedMutation = useMutation({
+    mutationFn: (projectIds: number[]) => markProjectsReviewed(supabase, projectIds),
+    onSuccess: (_, projectIds) => {
+      invalidateReviewedProjects(projectIds);
+      toast.success(
+        projectIds.length === 1 ?
+          "Project marked as reviewed"
+        : `${projectIds.length} projects marked as reviewed`
+      );
+      setReviewDialog({ open: false, projectIds: [] });
+      selection.exit();
+    },
+    onError: (error: Error) =>
+      toast.error(getUserFriendlyError(error, "project management")),
+  });
+
   const bulkAddTranslatorsMutation = useMutation({
     mutationFn: async ({
       projects,
       userIds,
       messages,
+      reviewIds = [],
     }: {
       projects: { id: number; translatorIds: string[] }[];
       userIds: string[];
       messages: Record<string, string>;
+      /** Projects still to review: marked reviewed first, then assigned. */
+      reviewIds?: number[];
     }) => {
+      await markProjectsReviewed(supabase, reviewIds);
       const { assignments, skipped } = buildBulkAssignments(projects, userIds, messages);
       if (assignments.length > 0) {
         await addCollaborators(supabase, assignments, user?.id);
@@ -502,10 +531,13 @@ function ProjectManagementContent() {
         );
       }
       setBulkAddTranslatorOpen(false);
+      setReviewAssignIds(null);
       selection.exit();
     },
-    onError: (error: Error) =>
-      toast.error(getUserFriendlyError(error, "project management")),
+    onError: (error: Error) => {
+      toast.error(getUserFriendlyError(error, "project management"));
+      queryClient.invalidateQueries({ queryKey: queryKeys.projectsWithTranslators() });
+    },
   });
 
   const selfAssignMutation = useMutation({
@@ -702,15 +734,35 @@ function ProjectManagementContent() {
     }
   };
 
-  const handleSelectMultiple = (projectId: number) => {
+  const handleSelectMultiple = (
+    projectId: number,
+    returnTo: { kind: "review" | "complete"; projectIds: number[] } | null = null
+  ) => {
     setOpenMenu(null);
     handleCancelWordsLinesEdit();
+    selectMoreReturn.current = returnTo;
     selection.start(projectId);
   };
 
   const completeModalProjects = allProjects.filter((p) =>
     completeConfirmModal.projectIds.includes(p.id)
   );
+
+  const handleMarkReviewed = (projectId: number) => {
+    setOpenMenu(null);
+    setReviewDialog({ open: true, projectIds: [projectId] });
+  };
+
+  const reviewModalProjects = allProjects.filter((p) =>
+    reviewDialog.projectIds.includes(p.id)
+  );
+  const reviewAssignProjects = allProjects.filter((p) => reviewAssignIds?.includes(p.id));
+  const selectedToReviewIds = selectedProjects
+    .filter((p) => p.status === "pending_review")
+    .map((p) => p.id);
+
+  const toAssignmentTargets = (projects: typeof allProjects) =>
+    projects.map((p) => ({ id: p.id, translatorIds: p.translators.map((t) => t.id) }));
 
   const clearAllFilters = () => {
     setStoredCurrentPage(1);
@@ -930,7 +982,9 @@ function ProjectManagementContent() {
           isCreatingStmProject={createStmProjectMutation.isPending}
           onEditDetails={handleEditDetails}
           onCompleteProject={handleCompleteProject}
-          onSelectMultiple={handleSelectMultiple}
+          onSelectMultiple={(projectId) => handleSelectMultiple(projectId)}
+          onMarkReviewed={handleMarkReviewed}
+          showReviewedButton={activeTab === "toReview"}
           selection={selection}
           editingProjectId={editingProjectId}
           editFocusField={editFocusField}
@@ -960,7 +1014,9 @@ function ProjectManagementContent() {
           isCreatingStmProject={createStmProjectMutation.isPending}
           onEditDetails={handleEditDetails}
           onCompleteProject={handleCompleteProject}
-          onSelectMultiple={handleSelectMultiple}
+          onSelectMultiple={(projectId) => handleSelectMultiple(projectId)}
+          onMarkReviewed={handleMarkReviewed}
+          showReviewedButton={activeTab === "toReview"}
           selection={selection}
           editingProjectId={editingProjectId}
           editFocusField={editFocusField}
@@ -1048,19 +1104,7 @@ function ProjectManagementContent() {
               {completeModalProjects.length > 1 ? "These projects" : "This project"} will move
               to Concluded Projects and the other PMs and admins will be notified.
             </p>
-            <ul className="max-h-48 overflow-y-auto space-y-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 px-3 py-2">
-              {completeModalProjects.map((project) => (
-                <li
-                  key={project.id}
-                  className="font-medium text-gray-900 dark:text-white break-words"
-                >
-                  {formatProjectName(project.name)}
-                  <span className="ml-2 text-xs font-normal text-gray-500 dark:text-gray-400">
-                    {project.system} · {project.language_in} → {project.language_out}
-                  </span>
-                </li>
-              ))}
-            </ul>
+            <ProjectNameList projects={completeModalProjects} />
           </div>
         }
         cancelText="Select more"
@@ -1069,7 +1113,10 @@ function ProjectManagementContent() {
         // from the selection bar, just go back to the selection.
         onSecondaryAction={() => {
           if (!selection.isActive && completeConfirmModal.projectIds[0] != null) {
-            handleSelectMultiple(completeConfirmModal.projectIds[0]);
+            handleSelectMultiple(completeConfirmModal.projectIds[0], {
+              kind: "complete",
+              projectIds: completeConfirmModal.projectIds,
+            });
           }
         }}
         onConfirm={() => markCompleteMutation.mutate(completeConfirmModal.projectIds)}
@@ -1083,35 +1130,104 @@ function ProjectManagementContent() {
         onOpenChange={setBulkAddTranslatorOpen}
         projectId={0}
         projectName=""
-        bulkProjects={selectedProjects.map((p) => ({
-          id: p.id,
-          translatorIds: p.translators.map((t) => t.id),
-        }))}
+        bulkProjects={toAssignmentTargets(selectedProjects)}
+        notice={
+          selectedToReviewIds.length > 0 ?
+            `${selectedToReviewIds.length} of these ${selectedToReviewIds.length === 1 ? "is" : "are"} still to review and will be marked as reviewed.`
+          : undefined
+        }
         onAddTranslators={() => {}}
         onAddTranslatorsBulk={(userIds, messages) =>
           bulkAddTranslatorsMutation.mutate({
-            projects: selectedProjects.map((p) => ({
-              id: p.id,
-              translatorIds: p.translators.map((t) => t.id),
-            })),
+            projects: toAssignmentTargets(selectedProjects),
             userIds,
             messages,
+            reviewIds: selectedToReviewIds,
           })
         }
         isAdding={bulkAddTranslatorsMutation.isPending}
       />
 
-      {selection.isActive && !bulkAddTranslatorOpen && !completeConfirmModal.open && (
+      <MarkReviewedDialog
+        open={reviewDialog.open}
+        projects={reviewModalProjects}
+        onClose={() => setReviewDialog({ open: false, projectIds: [] })}
+        onSelectMore={() => {
+          const [firstId] = reviewDialog.projectIds;
+          setReviewDialog({ open: false, projectIds: [] });
+          // From a single project: enter multi-select with it; from the bar: back to the selection
+          if (!selection.isActive && firstId != null) {
+            handleSelectMultiple(firstId, { kind: "review", projectIds: reviewDialog.projectIds });
+          }
+        }}
+        onAddTranslator={() => {
+          reviewAssignSubmitted.current = false;
+          setReviewAssignIds(reviewDialog.projectIds);
+          setReviewDialog((prev) => ({ ...prev, open: false }));
+        }}
+        onMarkReviewed={() => markReviewedMutation.mutate(reviewDialog.projectIds)}
+        isLoading={markReviewedMutation.isPending}
+      />
+
+      <AddTranslatorDialog
+        open={reviewAssignIds !== null}
+        onOpenChange={(open) => {
+          if (open) return;
+          const ids = reviewAssignIds ?? [];
+          setReviewAssignIds(null);
+          // Closed without assigning: back to the review popup, nothing changed
+          if (!reviewAssignSubmitted.current) setReviewDialog({ open: true, projectIds: ids });
+        }}
+        projectId={reviewAssignProjects[0]?.id ?? 0}
+        projectName={reviewAssignProjects[0]?.name ?? ""}
+        assignedTranslatorIds={reviewAssignProjects[0]?.translators.map((t) => t.id) ?? []}
+        bulkProjects={
+          reviewAssignProjects.length > 1 ? toAssignmentTargets(reviewAssignProjects) : undefined
+        }
+        notice={`${reviewAssignProjects.length === 1 ? "This project" : "These projects"} will be marked as reviewed when you assign.`}
+        onAddTranslators={(_, userIds, messages) => {
+          reviewAssignSubmitted.current = true;
+          bulkAddTranslatorsMutation.mutate({
+            projects: toAssignmentTargets(reviewAssignProjects),
+            userIds,
+            messages,
+            reviewIds: reviewAssignProjects.map((p) => p.id),
+          });
+        }}
+        onAddTranslatorsBulk={(userIds, messages) => {
+          reviewAssignSubmitted.current = true;
+          bulkAddTranslatorsMutation.mutate({
+            projects: toAssignmentTargets(reviewAssignProjects),
+            userIds,
+            messages,
+            reviewIds: reviewAssignProjects.map((p) => p.id),
+          });
+        }}
+        isAdding={bulkAddTranslatorsMutation.isPending}
+      />
+
+      {selection.isActive &&
+        !bulkAddTranslatorOpen &&
+        !completeConfirmModal.open &&
+        !reviewDialog.open &&
+        reviewAssignIds === null && (
         <BulkSelectionBar
           count={selection.count}
           hint="Click or drag over projects to select · Esc to cancel"
-          onCancel={selection.exit}
+          onCancel={selection.cancel}
           actions={[
             {
               label: "Add translator",
               icon: UserPlus,
               className: "bg-blue-500 hover:bg-blue-600",
               onClick: () => setBulkAddTranslatorOpen(true),
+            },
+            {
+              label: "Mark as reviewed",
+              icon: ClipboardCheck,
+              className: "bg-amber-500 hover:bg-amber-600",
+              hidden: selectedToReviewIds.length === 0,
+              onClick: () => setReviewDialog({ open: true, projectIds: selectedToReviewIds }),
             },
             {
               label: "Mark as complete",

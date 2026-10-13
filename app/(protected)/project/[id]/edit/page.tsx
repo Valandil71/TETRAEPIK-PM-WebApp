@@ -53,7 +53,7 @@ import {
 const projectSchema = z.object({
   name: z.string().min(1, "Project name is required"),
   system: z.string().min(1, "System is required"),
-  status: z.enum(["active", "complete", "cancelled"]),
+  status: z.enum(["active", "complete", "cancelled", "pending_review"]),
   words: z.number().nullable().optional(),
   lines: z.number().nullable().optional(),
   language_in: z.string().nullable().optional(),
@@ -220,7 +220,7 @@ function EditProjectContent() {
       name: project.name || "",
       system: project.system || "",
       status:
-        (project.status as "active" | "complete" | "cancelled") || "active",
+        (project.status as ProjectFormValues["status"]) || "active",
       words: project.words ?? null,
       lines: project.lines ?? null,
       language_in: project.language_in || null,
@@ -382,7 +382,7 @@ function EditProjectContent() {
       name: dbChangedFields.has("name") ? project.name || "" : currentFormValues.name,
       system: dbChangedFields.has("system") ? project.system || "" : currentFormValues.system,
       status: dbChangedFields.has("status")
-        ? (project.status as "active" | "complete" | "cancelled") || "active"
+        ? (project.status as ProjectFormValues["status"]) || "active"
         : currentFormValues.status,
       words: dbChangedFields.has("words") ? project.words ?? null : currentFormValues.words,
       lines: dbChangedFields.has("lines") ? project.lines ?? null : currentFormValues.lines,
@@ -751,6 +751,7 @@ function EditProjectContent() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
+                          <SelectItem value="pending_review">To review</SelectItem>
                           <SelectItem value="active">Active</SelectItem>
                           <SelectItem value="complete">Complete</SelectItem>
                           <SelectItem value="cancelled">Cancelled</SelectItem>

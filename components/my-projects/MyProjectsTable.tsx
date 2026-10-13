@@ -10,6 +10,7 @@ import type { ProjectAssignment } from "@/types/project-assignment";
 import type { ProjectSelection } from "@/hooks/project/useProjectSelection";
 import { Checkbox } from "@/components/ui/checkbox";
 import { MyProjectsActionsMenu } from "./MyProjectsActionsMenu";
+import { TruncatedText } from "@/components/shared/TruncatedText";
 
 interface MyProjectsTableProps {
   projects: ProjectAssignment[];
@@ -94,9 +95,12 @@ export function MyProjectsTable({
     {
       header: "Project Name",
       render: (assignment: ProjectAssignment) => (
-        <span className="text-gray-900 dark:text-white max-w-[280px] block break-words line-clamp-2">
-          {formatProjectName(assignment.projects.name)}
-        </span>
+        <TruncatedText
+          text={formatProjectName(assignment.projects.name)}
+          copyValue={isSelecting ? undefined : assignment.projects.name}
+          copyMessage="Project name copied"
+          className="text-gray-900 dark:text-white max-w-[280px] min-w-[180px]"
+        />
       ),
     },
     {
@@ -141,9 +145,9 @@ export function MyProjectsTable({
     },
     {
       header: "Instructions",
-      className: "text-gray-500 dark:text-gray-400 text-xs md:text-sm max-w-xs truncate",
+      className: "text-gray-500 dark:text-gray-400 text-xs md:text-sm max-w-xs",
       render: (assignment: ProjectAssignment) => (
-        assignment.projects.instructions || "-"
+        <TruncatedText text={assignment.projects.instructions || "-"} />
       ),
     },
     ...(activeTab === "inProgress" ?

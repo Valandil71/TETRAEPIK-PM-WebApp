@@ -8,6 +8,7 @@ import {
   MessageSquare,
   ChevronDown,
   ChevronRight,
+  ClipboardCheck,
 } from "lucide-react";
 import { formatNumber, formatProjectName } from "@/utils/formatters";
 import { getStatusIcon } from "@/utils/projectTableHelpers";
@@ -33,6 +34,7 @@ import type { ProjectGroup } from "@/lib/projectGrouping";
 import { getGroupDisplayName, getGroupSelectionState } from "@/lib/projectGrouping";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { ProjectSelection } from "@/hooks/project/useProjectSelection";
+import { TruncatedText } from "@/components/shared/TruncatedText";
 
 interface ProjectWithTranslators {
   id: number;
@@ -54,7 +56,7 @@ interface ProjectWithTranslators {
   final_deadline: string | null;
   instructions?: string | null;
   sap_instructions?: import("@/types/project").SapInstructionEntry[] | null;
-  status: "complete" | "active" | "cancelled";
+  status: import("@/types/project").ProjectStatus;
   language_in: string;
   language_out: string;
 }
@@ -121,6 +123,10 @@ interface ManagementCardProps {
   onEditDetails: (projectId: number) => void;
   onCompleteProject: (projectId: number) => void;
   onSelectMultiple: (projectId: number) => void;
+  /** Opens the "Mark as reviewed" popup for a project still to be reviewed. */
+  onMarkReviewed: (projectId: number) => void;
+  /** To Review tab: show a "Reviewed" button next to the actions menu. */
+  showReviewedButton?: boolean;
   /** Multi-select mode: cards toggle (click or drag) instead of opening the project. */
   selection?: ProjectSelection;
   editingProjectId: number | null;
@@ -151,6 +157,8 @@ export function ManagementCard({
   onEditDetails,
   onCompleteProject,
   onSelectMultiple,
+  onMarkReviewed,
+  showReviewedButton = false,
   selection,
   editingProjectId,
   editFocusField,
@@ -245,6 +253,20 @@ export function ManagementCard({
             className="ml-2 text-xs md:text-sm"
           />
         </div>
+        <div className="flex items-center gap-1">
+        {showReviewedButton && project.status === "pending_review" && !isSelecting && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onMarkReviewed(project.id);
+            }}
+            className="inline-flex cursor-pointer items-center gap-1 px-3 py-1.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg transition-all text-sm hover:bg-green-500 dark:hover:bg-green-600 hover:text-white dark:hover:text-white hover:shadow-lg hover:scale-105 border border-gray-200 dark:border-gray-600 shadow-sm"
+          >
+            <ClipboardCheck className="w-4 h-4" />
+            Reviewed
+          </button>
+        )}
         <ProjectActionsMenu
           projectId={project.id}
           isOpen={openMenu === String(project.id)}
@@ -264,11 +286,18 @@ export function ManagementCard({
           onCompleteProject={() => onCompleteProject(project.id)}
           onSelectMultiple={() => onSelectMultiple(project.id)}
           hasTranslators={project.translators.length > 0}
+          isPendingReview={project.status === "pending_review"}
+          onMarkReviewed={() => onMarkReviewed(project.id)}
         />
+        </div>
       </div>
 
-      <h3 className="text-gray-900 dark:text-white text-sm font-bold mt-2 break-words line-clamp-2">
-        {formatProjectName(project.name)}
+      <h3 className="text-gray-900 dark:text-white text-sm font-bold mt-2">
+        <TruncatedText
+          text={formatProjectName(project.name)}
+          copyValue={isSelecting ? undefined : project.name}
+          copyMessage="Project name copied"
+        />
       </h3>
       <div className="text-gray-500 dark:text-gray-400 text-xs mt-1" onClick={(e) => e.stopPropagation()}>
         {editingProjectId === project.id ? (
@@ -368,6 +397,11 @@ export function ManagementCard({
                 );
               })}
             </div>
+        : project.status === "pending_review" ?
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-xs font-medium">
+            <ClipboardCheck className="w-3.5 h-3.5" />
+            To review
+          </span>
         : <span className="text-gray-400 dark:text-gray-500 text-xs italic">
             Not assigned
           </span>
@@ -391,16 +425,19 @@ export function ManagementCard({
         const canOpenInstructions = !isSelecting && !!onInstructionsClick && hasAnyInstructions;
 
         return (
-          <p
-            className={`text-gray-500 dark:text-gray-400 text-xs md:text-sm max-w-xs truncate mt-1 ${canOpenInstructions ? "cursor-pointer hover:text-blue-500 dark:hover:text-blue-400 transition-colors" : ""}`}
-            onClick={(e) => {
-              if (!canOpenInstructions) return;
-              e.stopPropagation();
-              onInstructionsClick(project);
-            }}
-          >
-            Instructions: {displayText}
-          </p>
+          <div className="text-gray-500 dark:text-gray-400 text-xs md:text-sm max-w-xs mt-1">
+            <TruncatedText
+              text={`Instructions: ${displayText}`}
+              onClick={
+                canOpenInstructions ?
+                  (e) => {
+                    e.stopPropagation();
+                    onInstructionsClick(project);
+                  }
+                : undefined
+              }
+            />
+          </div>
         );
       })()}
     </div>

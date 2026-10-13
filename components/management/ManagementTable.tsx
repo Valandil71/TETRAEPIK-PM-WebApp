@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Check, XCircle, MessageSquare, ChevronRight, ChevronDown } from "lucide-react";
+import { Check, XCircle, MessageSquare, ChevronRight, ChevronDown, ClipboardCheck } from "lucide-react";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { formatNumber, formatProjectName } from "@/utils/formatters";
 import { getStatusIcon } from "@/utils/projectTableHelpers";
@@ -27,6 +27,7 @@ import type { ProjectGroup } from "@/lib/projectGrouping";
 import { getGroupDisplayName, getGroupSelectionState } from "@/lib/projectGrouping";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { ProjectSelection } from "@/hooks/project/useProjectSelection";
+import { TruncatedText } from "@/components/shared/TruncatedText";
 
 interface ProjectWithTranslators {
   id: number;
@@ -48,7 +49,7 @@ interface ProjectWithTranslators {
   final_deadline: string | null;
   instructions?: string | null;
   sap_instructions?: import("@/types/project").SapInstructionEntry[] | null;
-  status: "complete" | "active" | "cancelled";
+  status: import("@/types/project").ProjectStatus;
   language_in: string;
   language_out: string;
 }
@@ -115,6 +116,10 @@ interface ManagementTableProps {
   onEditDetails: (projectId: number) => void;
   onCompleteProject: (projectId: number) => void;
   onSelectMultiple: (projectId: number) => void;
+  /** Opens the "Mark as reviewed" popup for a project still to be reviewed. */
+  onMarkReviewed: (projectId: number) => void;
+  /** To Review tab: show a "Reviewed" button next to the actions menu. */
+  showReviewedButton?: boolean;
   /** Multi-select mode: rows toggle (click or drag) instead of opening the project. */
   selection?: ProjectSelection;
   editingProjectId: number | null;
@@ -152,6 +157,8 @@ export function ManagementTable({
   onEditDetails,
   onCompleteProject,
   onSelectMultiple,
+  onMarkReviewed,
+  showReviewedButton = false,
   selection,
   editingProjectId,
   editFocusField,
@@ -237,16 +244,16 @@ export function ManagementTable({
               opaque cell backgrounds prevent rows showing through. */}
           <thead className="sticky z-20" style={{ top: headerOffset }}>
             <tr className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
-              <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300 w-4 bg-gray-50 dark:bg-gray-900" />
-              <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900">System</th>
-              <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900">Project Name</th>
-              <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900">Languages</th>
-              <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300 text-right bg-gray-50 dark:bg-gray-900">Lines</th>
-              <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300 text-right bg-gray-50 dark:bg-gray-900">Words</th>
-              <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900">Collaborator(s)</th>
-              <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900">Due Date</th>
-              <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900">Instructions</th>
-              <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900">Actions</th>
+              <th className="px-4 py-4 text-left text-gray-700 dark:text-gray-300 w-4 bg-gray-50 dark:bg-gray-900" />
+              <th className="px-4 py-4 text-left text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900">System</th>
+              <th className="px-4 py-4 text-left text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900">Project Name</th>
+              <th className="px-4 py-4 text-left text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900">Languages</th>
+              <th className="px-4 py-4 text-left text-gray-700 dark:text-gray-300 text-right bg-gray-50 dark:bg-gray-900">Lines</th>
+              <th className="px-4 py-4 text-left text-gray-700 dark:text-gray-300 text-right bg-gray-50 dark:bg-gray-900">Words</th>
+              <th className="px-4 py-4 text-left text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900">Collaborator(s)</th>
+              <th className="px-4 py-4 text-left text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900">Due Date</th>
+              <th className="px-4 py-4 text-left text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900">Instructions</th>
+              <th className="px-4 py-4 text-left text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -307,7 +314,7 @@ export function ManagementTable({
                         onClick={(e) => handleRowClick(project, e)}
                         {...(isSelecting ? selection.getItemProps(project.id) : {})}
                       >
-                        <td className={`px-6 py-4 relative ${isGrouped ? "pl-10" : ""}`}>
+                        <td className={`px-4 py-4 relative ${isGrouped ? "pl-10" : ""}`}>
                           {isGrouped && (
                             <>
                               <div className="absolute left-3 top-0 bottom-0 w-px bg-blue-200/70 dark:bg-blue-800/50" />
@@ -323,20 +330,23 @@ export function ManagementTable({
                             />
                           )}
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-4 py-4">
                           <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-gray-900 dark:text-blue-400 text-sm">
                             {project.system}
                           </span>
                         </td>
-                        <td className="px-6 py-4">
-                          <span className="text-gray-900 dark:text-white max-w-[280px] block break-words line-clamp-2">
-                            {formatProjectName(project.name)}
-                          </span>
+                        <td className="px-4 py-4">
+                          <TruncatedText
+                            text={formatProjectName(project.name)}
+                            copyValue={isSelecting ? undefined : project.name}
+                            copyMessage="Project name copied"
+                            className="text-gray-900 dark:text-white max-w-[280px] min-w-[180px]"
+                          />
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-4 py-4">
                           <LanguagePair languageIn={project.language_in} languageOut={project.language_out} />
                         </td>
-                        <td className="px-6 py-4 text-right">
+                        <td className="px-4 py-4 text-right">
                           <div onClick={(e) => e.stopPropagation()}>
                             {editingProjectId === project.id ?
                               <input
@@ -366,7 +376,7 @@ export function ManagementTable({
                             }
                           </div>
                         </td>
-                        <td className="px-6 py-4 text-right">
+                        <td className="px-4 py-4 text-right">
                           <div onClick={(e) => e.stopPropagation()}>
                             {editingProjectId === project.id ?
                               <div className="flex items-center justify-end gap-2">
@@ -413,7 +423,7 @@ export function ManagementTable({
                             }
                           </div>
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-4 py-4">
                           {project.translators.length > 0 ?
                             <div className="flex flex-wrap gap-2">
                                 {project.translators.map((translator) => {
@@ -456,19 +466,24 @@ export function ManagementTable({
                                   );
                                 })}
                               </div>
+                          : project.status === "pending_review" ?
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-xs font-medium">
+                                <ClipboardCheck className="w-3.5 h-3.5" />
+                                To review
+                              </span>
                           : <span className="text-gray-400 dark:text-gray-500 text-xs italic">
                               Not assigned
                             </span>
                           }
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-4 py-4">
                           <DeadlineDisplay
                             initialDeadline={project.initial_deadline}
                             interimDeadline={project.interim_deadline}
                             finalDeadline={project.final_deadline}
                           />
                         </td>
-                        <td className="px-6 py-4 text-gray-500 dark:text-gray-400 text-xs md:text-sm max-w-xs">
+                        <td className="px-4 py-4 text-gray-500 dark:text-gray-400 text-xs md:text-sm max-w-xs">
                           {(() => {
                             const { displayText, hasAnyInstructions } =
                               getInstructionsPreview({
@@ -480,25 +495,35 @@ export function ManagementTable({
                               !isSelecting && !!onInstructionsClick && hasAnyInstructions;
 
                             return (
-                              <span
-                                className={`line-clamp-3 ${
+                              <TruncatedText
+                                text={displayText}
+                                onClick={
                                   canOpenInstructions ?
-                                    "cursor-pointer hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
-                                  : ""
-                                }`}
-                                onClick={(e) => {
-                                  if (!canOpenInstructions) return;
-                                  e.stopPropagation();
-                                  onInstructionsClick(project);
-                                }}
-                              >
-                                {displayText}
-                              </span>
+                                    (e) => {
+                                      e.stopPropagation();
+                                      onInstructionsClick(project);
+                                    }
+                                  : undefined
+                                }
+                              />
                             );
                           })()}
                         </td>
-                        <td className="px-6 py-4">
-                          <div onClick={(e) => e.stopPropagation()}>
+                        <td className="px-4 py-4">
+                          <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                            {showReviewedButton && project.status === "pending_review" && !isSelecting && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onMarkReviewed(project.id);
+                                }}
+                                className="inline-flex cursor-pointer items-center gap-1 px-3 py-1.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg transition-all text-sm hover:bg-green-500 dark:hover:bg-green-600 hover:text-white dark:hover:text-white hover:shadow-lg hover:scale-105 border border-gray-200 dark:border-gray-600 shadow-sm"
+                              >
+                                <ClipboardCheck className="w-4 h-4" />
+                                Reviewed
+                              </button>
+                            )}
                             <ProjectActionsMenu
                               projectId={project.id}
                               isOpen={openMenu === String(project.id)}
@@ -524,6 +549,8 @@ export function ManagementTable({
                               }
                               onSelectMultiple={() => onSelectMultiple(project.id)}
                               hasTranslators={project.translators.length > 0}
+                              isPendingReview={project.status === "pending_review"}
+                              onMarkReviewed={() => onMarkReviewed(project.id)}
                             />
                           </div>
                         </td>

@@ -43,7 +43,7 @@ End-to-end flow from SAP TPM to the local database. The app uses manual imports 
 8. `dedupeImportProjects()` removes duplicate payloads with the same `sap_import_key`.
 9. `findExistingProject()` decides whether each payload updates an existing row or inserts a new one.
 10. `updateProjectFromSap()` updates existing SAP-owned fields and tracks changes for the report.
-11. `insertProjectFromSap()` creates new local project rows.
+11. `insertProjectFromSap()` creates new local project rows. Rows without lines/words (XTM words ≤ 1, hours ignored) start as `pending_review` and show in Manage Projects → To Review; the rest start as `active`.
 12. `createImportReport()` creates a manual import report when new or modified projects exist.
 
 ## Matching And Duplicate Prevention

@@ -5,6 +5,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { SapProjectForImport } from '@/types/sap';
 import { TRACKED_FIELDS } from './constants';
 import { collectTrackedChanges, type ReportChanges } from './sync-utils';
+import { initialImportStatus } from '@/lib/projects/reviewStatus';
 import {
   appendDeadlineVariantToImportKey,
   getDeadlineVariantFromImportKey,
@@ -264,7 +265,8 @@ export async function insertProjectFromSap(
       ...buildSapUpdatePayload(data),
       sap_subproject_id: data.sap_subproject_id,
       api_source: data.api_source,
-      status: 'active',
+      // Projects without lines/words wait in "To Review" until a PM sets the volume.
+      status: initialImportStatus(data),
     })
     .select('id')
     .single();

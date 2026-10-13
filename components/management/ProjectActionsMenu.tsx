@@ -10,6 +10,7 @@ import {
   Loader2,
   Edit,
   ListChecks,
+  ClipboardCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -34,6 +35,9 @@ interface ProjectActionsMenuProps {
   onSelectMultiple: () => void;
   /** "Remove a translator" is only offered when someone is assigned. */
   hasTranslators: boolean;
+  /** Projects to review offer "Mark as reviewed" instead of assigning directly. */
+  isPendingReview?: boolean;
+  onMarkReviewed?: () => void;
 }
 
 export function ProjectActionsMenu({
@@ -49,6 +53,8 @@ export function ProjectActionsMenu({
   onCompleteProject,
   onSelectMultiple,
   hasTranslators,
+  isPendingReview = false,
+  onMarkReviewed,
 }: ProjectActionsMenuProps) {
   const handleOpenChange = (open: boolean) => {
     // Only call onToggle when closing (to sync parent state)
@@ -88,26 +94,40 @@ export function ProjectActionsMenu({
           Complete Project
         </DropdownMenuItem>
         <DropdownMenuSeparator className="bg-gray-200 dark:bg-gray-700" />
-        <DropdownMenuItem
-          className="cursor-pointer px-4 py-2.5 text-gray-700 dark:text-gray-300 hover:bg-blue-100 dark:hover:bg-gray-700 focus:bg-blue-100 dark:focus:bg-gray-700"
-          onClick={(e) => {
-            e.stopPropagation();
-            onAddTranslator();
-          }}
-        >
-          <UserPlus className="w-4 h-4 mr-2" />
-          Add translator
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          className="cursor-pointer px-4 py-2.5 text-gray-700 dark:text-gray-300 hover:bg-blue-100 dark:hover:bg-gray-700 focus:bg-blue-100 dark:focus:bg-gray-700"
-          onClick={(e) => {
-            e.stopPropagation();
-            onSelfAssign();
-          }}
-        >
-          <UserCheck className="w-4 h-4 mr-2" />
-          Self-Assign
-        </DropdownMenuItem>
+        {isPendingReview ?
+          <DropdownMenuItem
+            className="cursor-pointer px-4 py-2.5 text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 focus:bg-amber-50 dark:focus:bg-amber-900/20 focus:text-amber-700 dark:focus:text-amber-400"
+            onClick={(e) => {
+              e.stopPropagation();
+              onMarkReviewed?.();
+            }}
+          >
+            <ClipboardCheck className="w-4 h-4 mr-2" />
+            Mark as reviewed
+          </DropdownMenuItem>
+        : <>
+          <DropdownMenuItem
+            className="cursor-pointer px-4 py-2.5 text-gray-700 dark:text-gray-300 hover:bg-blue-100 dark:hover:bg-gray-700 focus:bg-blue-100 dark:focus:bg-gray-700"
+            onClick={(e) => {
+              e.stopPropagation();
+              onAddTranslator();
+            }}
+          >
+            <UserPlus className="w-4 h-4 mr-2" />
+            Add translator
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            className="cursor-pointer px-4 py-2.5 text-gray-700 dark:text-gray-300 hover:bg-blue-100 dark:hover:bg-gray-700 focus:bg-blue-100 dark:focus:bg-gray-700"
+            onClick={(e) => {
+              e.stopPropagation();
+              onSelfAssign();
+            }}
+          >
+            <UserCheck className="w-4 h-4 mr-2" />
+            Self-Assign
+          </DropdownMenuItem>
+          </>
+        }
         {hasTranslators && (
           <DropdownMenuItem
             className="cursor-pointer px-4 py-2.5 text-gray-700 dark:text-gray-300 hover:bg-red-100 dark:hover:bg-gray-700 hover:text-red-700 dark:hover:text-red-400 focus:bg-red-100 dark:focus:bg-gray-700 focus:text-red-700 dark:focus:text-red-400"

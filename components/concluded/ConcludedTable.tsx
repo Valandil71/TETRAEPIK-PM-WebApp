@@ -11,6 +11,7 @@ import { DeadlineDisplay } from "@/components/general/DeadlineDisplay";
 import { LanguagePair } from "@/components/shared/LanguagePair";
 import type { ProjectGroup } from "@/lib/projectGrouping";
 import { getGroupDisplayName } from "@/lib/projectGrouping";
+import { TruncatedText } from "@/components/shared/TruncatedText";
 
 interface ConcludedTableProps {
   groups: ProjectGroup<ProjectWithTranslators>[];
@@ -114,9 +115,12 @@ export function ConcludedTable({
                           </span>
                         </td>
                         <td className="px-6 py-4">
-                          <span className="text-gray-900 dark:text-white max-w-[280px] block break-words line-clamp-2">
-                            {formatProjectName(project.name)}
-                          </span>
+                          <TruncatedText
+                            text={formatProjectName(project.name)}
+                            copyValue={project.name}
+                            copyMessage="Project name copied"
+                            className="text-gray-900 dark:text-white max-w-[280px] min-w-[180px]"
+                          />
                         </td>
                         <td className="px-6 py-4">
                           <LanguagePair languageIn={project.language_in} languageOut={project.language_out} />
@@ -154,14 +158,16 @@ export function ConcludedTable({
                             finalDeadline={project.final_deadline}
                           />
                         </td>
-                        <td className="px-6 py-4 text-gray-500 dark:text-gray-400 text-sm max-w-xs truncate">
-                          {
-                            getInstructionsPreview({
-                              instructions: project.instructions,
-                              sapInstructions: project.sap_instructions,
-                              exclusionSet,
-                            }).displayText
-                          }
+                        <td className="px-6 py-4 text-gray-500 dark:text-gray-400 text-sm max-w-xs">
+                          <TruncatedText
+                            text={
+                              getInstructionsPreview({
+                                instructions: project.instructions,
+                                sapInstructions: project.sap_instructions,
+                                exclusionSet,
+                              }).displayText
+                            }
+                          />
                         </td>
                       </tr>
                     ))}

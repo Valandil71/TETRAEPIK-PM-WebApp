@@ -103,3 +103,23 @@ describe("useProjectSelection", () => {
     expect(result.current.isActive).toBe(false);
   });
 });
+
+describe("useProjectSelection cancel", () => {
+  it("runs onCancel when the user cancels (button or Esc), but not on exit after an action", () => {
+    let cancelled = 0;
+    const { result } = renderHook(() => useProjectSelection({ onCancel: () => cancelled++ }));
+
+    act(() => result.current.start(1));
+    act(() => result.current.exit());
+    expect(cancelled).toBe(0);
+
+    act(() => result.current.start(1));
+    act(() => result.current.cancel());
+    expect(cancelled).toBe(1);
+    expect(result.current.isActive).toBe(false);
+
+    act(() => result.current.start(1));
+    act(() => window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" })));
+    expect(cancelled).toBe(2);
+  });
+});

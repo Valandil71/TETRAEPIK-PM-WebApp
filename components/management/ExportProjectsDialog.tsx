@@ -29,7 +29,7 @@ const SCOPE_OPTIONS: { id: ExportScope; label: string; description: string }[] =
     {
       id: "active",
       label: "Active Projects",
-      description: "Only currently active projects",
+      description: "Only currently active projects (including those to review)",
     },
     {
       id: "complete",
@@ -59,8 +59,10 @@ export function ExportProjectsDialog({
         .select("*")
         .order("final_deadline", { ascending: true });
 
-      if (scope !== "all") {
-        query = query.eq("status", scope);
+      if (scope === "active") {
+        query = query.in("status", ["active", "pending_review"]);
+      } else if (scope === "complete") {
+        query = query.eq("status", "complete");
       }
 
       const { data, error } = await query;

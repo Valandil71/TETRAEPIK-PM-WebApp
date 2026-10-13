@@ -6,7 +6,7 @@
  */
 
 /** Project status a project list is filtered by. */
-export type ProjectListStatus = 'active' | 'complete';
+export type ProjectListStatus = 'active' | 'complete' | 'pending_review';
 
 export const queryKeys = {
   // User-related queries

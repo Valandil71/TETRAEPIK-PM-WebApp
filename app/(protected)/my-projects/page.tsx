@@ -328,7 +328,7 @@ export default function MyProjectsPage() {
         <BulkSelectionBar
           count={selection.count}
           hint="Click or drag over projects to select · Esc to cancel"
-          onCancel={selection.exit}
+          onCancel={selection.cancel}
           actions={[
             activeTab === "unclaimed" ?
               {

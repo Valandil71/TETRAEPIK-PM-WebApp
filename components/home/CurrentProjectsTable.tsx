@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { formatNumber } from "@/utils/formatters";
+import { formatNumber, formatProjectName } from "@/utils/formatters";
 import { getStatusIcon } from "@/utils/projectTableHelpers";
 import { ProjectTableBase } from "@/components/shared/ProjectTableBase";
 import { LanguagePair } from "@/components/shared/LanguagePair";
@@ -18,6 +18,7 @@ import { getInstructionsPreview } from "@/utils/instructionsPreview";
 import { useInstructionExclusions } from "@/hooks/settings/useInstructionExclusions";
 import { toast } from "sonner";
 import type { ProjectWithTranslators } from "@/types/project";
+import { TruncatedText } from "@/components/shared/TruncatedText";
 
 interface CurrentProjectsTableProps {
   projects: ProjectWithTranslators[];
@@ -60,7 +61,12 @@ export function CurrentProjectsTable({ projects }: CurrentProjectsTableProps) {
     {
       header: "Project",
       render: (project: ProjectWithTranslators) => (
-        <span className="text-gray-900 dark:text-white">{project.name}</span>
+        <TruncatedText
+          text={formatProjectName(project.name)}
+          copyValue={project.name}
+          copyMessage="Project name copied"
+          className="text-gray-900 dark:text-white max-w-[280px] min-w-[180px]"
+        />
       ),
     },
     {
@@ -141,14 +147,14 @@ export function CurrentProjectsTable({ projects }: CurrentProjectsTableProps) {
     },
     {
       header: "Instructions",
-      className: "text-gray-500 dark:text-gray-400 text-xs md:text-sm max-w-xs truncate",
+      className: "text-gray-500 dark:text-gray-400 text-xs md:text-sm max-w-xs",
       render: (project: ProjectWithTranslators) => {
         const { displayText } = getInstructionsPreview({
           instructions: project.instructions,
           sapInstructions: project.sap_instructions,
           exclusionSet,
         });
-        return displayText;
+        return <TruncatedText text={displayText} />;
       },
     },
   ];

@@ -1,11 +1,12 @@
 import { create } from 'zustand';
+import type { ManagementTab } from '@/lib/projects/managementTabs';
 import {
   createDefaultProjectFilterState,
   type ProjectFilterState,
   type ProjectFilterUpdate,
 } from '@/lib/projectFilterState';
 
-type ProjectStatus = 'all' | 'ready' | 'inProgress' | 'unclaimed';
+type ProjectStatus = ManagementTab;
 type ViewMode = 'table' | 'card';
 
 interface ManagementPageState {

@@ -9,6 +9,7 @@ import type { ProjectAssignment } from "@/types/project-assignment";
 import type { ProjectSelection } from "@/hooks/project/useProjectSelection";
 import { Checkbox } from "@/components/ui/checkbox";
 import { MyProjectsActionsMenu } from "./MyProjectsActionsMenu";
+import { TruncatedText } from "@/components/shared/TruncatedText";
 
 interface MyProjectsCardProps {
   projects: ProjectAssignment[];
@@ -104,8 +105,12 @@ export function MyProjectsCard({
                 </div>
               )}
             </div>
-            <h3 className="text-gray-900 dark:text-white text-lg font-bold mb-2 break-words line-clamp-2">
-              {formatProjectName(project.name)}
+            <h3 className="text-gray-900 dark:text-white text-lg font-bold mb-2">
+              <TruncatedText
+                text={formatProjectName(project.name)}
+                copyValue={isSelecting ? undefined : project.name}
+                copyMessage="Project name copied"
+              />
             </h3>
             <p className="text-gray-500 dark:text-gray-400 text-sm mb-1">
               Lines: {project.lines ? formatNumber(project.lines) : "-"}
@@ -121,9 +126,9 @@ export function MyProjectsCard({
                 finalDeadline={project.final_deadline}
               />
             </div>
-            <p className="text-gray-500 dark:text-gray-400 text-sm max-w-xs truncate mb-4">
-              {project.instructions || "-"}
-            </p>
+            <div className="text-gray-500 dark:text-gray-400 text-sm max-w-xs mb-4">
+              <TruncatedText text={project.instructions || "-"} />
+            </div>
             {activeTab === "inProgress" && assignment.initial_message && (
               <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 mb-4 flex gap-2">
                 <Info className="w-4 h-4 text-blue-500 dark:text-blue-400 shrink-0 mt-0.5" />

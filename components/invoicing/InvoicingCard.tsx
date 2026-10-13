@@ -13,6 +13,7 @@ import {
   getGroupDisplayName,
   getGroupSelectionState,
 } from "@/lib/projectGrouping";
+import { TruncatedText } from "@/components/shared/TruncatedText";
 
 interface InvoicingCardProps {
   groups: ProjectGroup<ProjectWithTranslators>[];
@@ -74,8 +75,12 @@ export function InvoicingCard({
           </div>
         </div>
 
-        <h3 className="text-gray-900 dark:text-white mb-4 break-words line-clamp-2">
-          {formatProjectName(project.name)}
+        <h3 className="text-gray-900 dark:text-white mb-4">
+          <TruncatedText
+            text={formatProjectName(project.name)}
+            copyValue={project.name}
+            copyMessage="Project name copied"
+          />
         </h3>
 
         <div className="space-y-3 mb-4">
@@ -134,13 +139,17 @@ export function InvoicingCard({
         </div>
 
         <div className="pt-3 border-t border-gray-200 dark:border-gray-700">
-          <p className="text-gray-500 dark:text-gray-400 text-sm line-clamp-2">
-            {getInstructionsPreview({
-              instructions: project.instructions,
-              sapInstructions: project.sap_instructions,
-              exclusionSet,
-            }).displayText}
-          </p>
+          <div className="text-gray-500 dark:text-gray-400 text-sm">
+            <TruncatedText
+              text={
+                getInstructionsPreview({
+                  instructions: project.instructions,
+                  sapInstructions: project.sap_instructions,
+                  exclusionSet,
+                }).displayText
+              }
+            />
+          </div>
         </div>
       </div>
     );

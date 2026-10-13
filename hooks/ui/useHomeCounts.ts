@@ -31,7 +31,7 @@ export function useHomeCounts() {
     staleTime: 2 * 60 * 1000, // 2 minutes
   });
 
-  // Count of active projects: same set the Manage Projects list shows
+  // Active + to-review projects: same set the Manage Projects "All Projects" tab shows
   const { data: manageProjectsCount = 0, isLoading: manageProjectsLoading } =
     useQuery({
       queryKey: queryKeys.homeManageProjectsCount(),
@@ -39,7 +39,7 @@ export function useHomeCounts() {
         const { count, error } = await supabase
           .from("projects")
           .select("*", { count: "exact", head: true })
-          .eq("status", "active");
+          .in("status", ["active", "pending_review"]);
 
         if (error) {
           throw new Error(

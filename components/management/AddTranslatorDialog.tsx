@@ -49,6 +49,8 @@ interface AddTranslatorDialogProps {
    */
   bulkProjects?: { id: number; translatorIds: string[] }[];
   onAddTranslatorsBulk?: (userIds: string[], messages: Record<string, string>) => void;
+  /** Extra note under the description (e.g. "2 of these will be marked as reviewed"). */
+  notice?: string;
 }
 
 export function AddTranslatorDialog({
@@ -62,6 +64,7 @@ export function AddTranslatorDialog({
   isAdding,
   bulkProjects,
   onAddTranslatorsBulk,
+  notice,
 }: AddTranslatorDialogProps) {
   const isBulk = !!bulkProjects;
   const bulkCount = bulkProjects?.length ?? 0;
@@ -203,6 +206,9 @@ export function AddTranslatorDialog({
                 </>
               }
             </DialogDescription>
+            {notice && (
+              <p className="text-sm text-amber-700 dark:text-amber-400">{notice}</p>
+            )}
           </DialogHeader>
 
           {/* Scrollable content area */}

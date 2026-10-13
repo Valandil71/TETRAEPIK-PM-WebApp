@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { buildSapUpdatePayload, findExistingProject } from '@/lib/sap/project-writer';
+import { buildSapUpdatePayload, findExistingProject, insertProjectFromSap } from '@/lib/sap/project-writer';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import type { SapProjectForImport } from '@/types/sap';
 
 const baseData: SapProjectForImport = {
@@ -138,5 +139,33 @@ describe('findExistingProject', () => {
 
     expect(result.error).toBeNull();
     expect(result.data).toEqual({ id: 22 });
+  });
+});
+
+describe('insertProjectFromSap status', () => {
+  function captureInsert() {
+    const inserted: Record<string, unknown>[] = [];
+    const supabase = {
+      from: () => ({
+        insert: (row: Record<string, unknown>) => {
+          inserted.push(row);
+          return { select: () => ({ single: async () => ({ data: { id: 1 }, error: null }) }) };
+        },
+      }),
+    } as unknown as SupabaseClient;
+    return { supabase, inserted };
+  }
+
+  it('inserts projects with a volume as active', async () => {
+    const { supabase, inserted } = captureInsert();
+    await insertProjectFromSap(supabase, baseData);
+    expect(inserted[0].status).toBe('active');
+  });
+
+  it('inserts projects without lines/words (XTM words = presence flag) as pending_review', async () => {
+    const { supabase, inserted } = captureInsert();
+    await insertProjectFromSap(supabase, { ...baseData, system: 'XTM', words: 1, lines: null });
+    await insertProjectFromSap(supabase, { ...baseData, system: 'SSE', words: null, lines: null, hours: 2 });
+    expect(inserted.map((row) => row.status)).toEqual(['pending_review', 'pending_review']);
   });
 });

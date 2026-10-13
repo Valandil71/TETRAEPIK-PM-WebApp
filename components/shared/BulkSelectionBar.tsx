@@ -10,7 +10,8 @@ export interface BulkSelectionAction {
   onClick: () => void;
   /** Tailwind classes for the button colour. */
   className: string;
-  disabled?: boolean;
+  /** Hidden (not just disabled) when the action does not apply to the current selection. */
+  hidden?: boolean;
   /** Shows a spinner and "Processing..." while the action runs. */
   isLoading?: boolean;
 }
@@ -50,11 +51,13 @@ export function BulkSelectionBar({
         )}
       </div>
       <div className="flex items-center gap-2">
-        {actions.map(({ label, icon: Icon, onClick, className, disabled, isLoading }) => (
+        {/* Only the actions that can be taken now; nothing applies to an empty selection */}
+        {(count === 0 ? [] : actions.filter((action) => !action.hidden)).map(
+          ({ label, icon: Icon, onClick, className, isLoading }) => (
           <Button
             key={label}
             onClick={onClick}
-            disabled={disabled || isLoading || count === 0}
+            disabled={isLoading}
             className={`text-white ${className}`}
           >
             {isLoading ?
@@ -62,7 +65,8 @@ export function BulkSelectionBar({
             : Icon && <Icon className="w-4 h-4 mr-1.5" />}
             {isLoading ? "Processing..." : label}
           </Button>
-        ))}
+          )
+        )}
         <Button variant="outline" onClick={onCancel}>
           <X className="w-4 h-4 mr-1.5" />
           {cancelLabel}
