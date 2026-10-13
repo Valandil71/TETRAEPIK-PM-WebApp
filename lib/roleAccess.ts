@@ -8,7 +8,6 @@ export const RouteId = {
   SETTINGS: "settings",
   PROJECT: "project",
   PROJECT_EDIT: "project-edit",
-  ASSIGN_PROJECTS: "assign-projects",
   MANAGEMENT: "management",
   CONCLUDED_PROJECTS: "concluded-projects",
   WORKLOAD: "workload",
@@ -26,7 +25,6 @@ const routeAccessMap: Record<RouteIdType, UserRole[]> = {
   [RouteId.SETTINGS]: ["employee", "pm", "admin"],
   [RouteId.PROJECT]: ["employee", "pm", "admin"], // Translators have additional assignment check
   [RouteId.PROJECT_EDIT]: ["pm", "admin"],
-  [RouteId.ASSIGN_PROJECTS]: ["pm", "admin"],
   [RouteId.MANAGEMENT]: ["pm", "admin"],
   [RouteId.CONCLUDED_PROJECTS]: ["pm", "admin"],
   [RouteId.WORKLOAD]: ["pm", "admin"],
@@ -55,13 +53,6 @@ export const navItems: NavItem[] = [
     routeId: RouteId.MY_PROJECTS,
     allowedRoles: ["employee", "pm", "admin"],
   },
-  // "Assign Projects" hidden from navigation: page kept as the base for a future bulk assignment (still reachable by direct URL).
-  // {
-  //   path: "/assign-projects",
-  //   label: "Assign Projects",
-  //   routeId: RouteId.ASSIGN_PROJECTS,
-  //   allowedRoles: ["pm", "admin"],
-  // },
   {
     path: "/management",
     label: "Manage Projects",

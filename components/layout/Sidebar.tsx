@@ -6,7 +6,6 @@ import { Fragment, useEffect, useState, useMemo } from "react";
 import {
   Home,
   FolderKanban,
-  // UserPlus, // only used by the hidden "Assign Projects" item
   Settings,
   ClipboardList,
   ChevronLeft,
@@ -49,13 +48,6 @@ const allNavItems: NavItemConfig[] = [
     allowedRoles: ["employee", "pm", "admin"],
     section: "My Work",
   },
-  // "Assign Projects" hidden from navigation: page kept as the base for a future bulk assignment (still reachable by direct URL).
-  // {
-  //   path: "/assign-projects",
-  //   icon: UserPlus,
-  //   label: "Assign Projects",
-  //   allowedRoles: ["pm", "admin"],
-  // },
   {
     path: "/management",
     icon: FolderKanban,
