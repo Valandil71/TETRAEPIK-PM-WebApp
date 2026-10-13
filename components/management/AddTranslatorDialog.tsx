@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { Clock, CheckCircle2, AlertTriangle } from "lucide-react";
 import { useUsers } from "@/hooks/user/useUsers";
 import { useUserWorkload } from "@/hooks/user/useUserWorkload";
+import type { ProjectListStatus } from "@/lib/queryKeys";
 import type { User } from "@/types/user";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { formatRoleDisplay } from "@/utils/formatters";
@@ -51,6 +52,8 @@ interface AddTranslatorDialogProps {
   onAddTranslatorsBulk?: (userIds: string[], messages: Record<string, string>) => void;
   /** Extra note under the description (e.g. "2 of these will be marked as reviewed"). */
   notice?: string;
+  /** Project list the workload column counts from (see useUserWorkload). */
+  workloadListStatus?: ProjectListStatus;
 }
 
 export function AddTranslatorDialog({
@@ -65,6 +68,7 @@ export function AddTranslatorDialog({
   bulkProjects,
   onAddTranslatorsBulk,
   notice,
+  workloadListStatus,
 }: AddTranslatorDialogProps) {
   const isBulk = !!bulkProjects;
   const bulkCount = bulkProjects?.length ?? 0;
@@ -77,7 +81,7 @@ export function AddTranslatorDialog({
     return counts;
   }, [bulkProjects]);
   const { data: users, isLoading: usersLoading } = useUsers();
-  const { workloads, isLoading: workloadsLoading } = useUserWorkload();
+  const { workloads, isLoading: workloadsLoading } = useUserWorkload(workloadListStatus);
   const [selectedTranslators, setSelectedTranslators] = useState<Set<string>>(
     new Set()
   );

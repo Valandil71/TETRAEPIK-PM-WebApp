@@ -23,6 +23,8 @@ type Resolver = (query: RecordedQuery) => unknown[];
 
 const recorded: RecordedQuery[] = [];
 let resolve: Resolver = () => [];
+// Requests to these tables wait until their promise settles
+let blocked: Record<string, Promise<void>> = {};
 
 // Minimal thenable stand-in for the supabase-js query builder.
 function from(table: string) {
@@ -54,7 +56,9 @@ function from(table: string) {
     },
     then(onFulfilled: (value: { data: unknown[]; error: null }) => unknown) {
       recorded.push(query);
-      return Promise.resolve({ data: resolve(query), error: null }).then(onFulfilled);
+      return (blocked[table] ?? Promise.resolve())
+        .then(() => ({ data: resolve(query), error: null }))
+        .then(onFulfilled);
     },
   };
   return builder;
@@ -94,16 +98,20 @@ function defaultResolver(query: RecordedQuery): unknown[] {
   if (query.table === "instruction_exclusions_v2") {
     return [{ id: 1, normalized_text: "boilerplate", is_active: true }];
   }
-  const inFilter = query.filters.find(([name]) => name === "in");
+  const inFilter = query.filters.find(([name, column]) => name === "in" && column === "id");
   if (!inFilter) {
     if (pageStart(query) > 0) return [];
-    return [
+    const rows = [
       projectRow(1, "Use glossary", [{ assignment_status: "claimed", done_message: null, users: user }]),
       projectRow(2, null),
       projectRow(3, "   "),
       projectRow(4, ""),
       projectRow(5, null),
     ];
+    // Working lists select the first SAP entry along with the list
+    return query.select.includes("sap_first") ?
+        rows.map((row) => ({ ...row, sap_first: sapByProject[row.id]?.[0] ?? null }))
+      : rows;
   }
   const ids = inFilter[2] as number[];
   const withSap = ids.filter((id) => sapByProject[id]);
@@ -136,17 +144,21 @@ describe("useProjectsWithTranslators", () => {
   beforeEach(() => {
     recorded.length = 0;
     resolve = defaultResolver;
+    blocked = {};
   });
 
-  it("does not select sap_instructions in the list and embeds assignments", async () => {
+  it("selects only the first SAP entry in the list and embeds assignments", async () => {
     const { result } = renderHook(() => useProjectsWithTranslators(false, true), { wrapper });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
     const listQuery = recorded[0];
     expect(listQuery.table).toBe("projects");
-    expect(listQuery.select).not.toContain("sap_instructions");
+    expect(listQuery.select).toContain("sap_first:sap_instructions->0");
+    expect(listQuery.select.replace("sap_first:sap_instructions->0", "")).not.toContain(
+      "sap_instructions"
+    );
     expect(listQuery.select).toContain("projects_assignment (");
-    expect(listQuery.filters).toContainEqual(["eq", "status", "active"]);
+    expect(listQuery.filters).toContainEqual(["in", "status", ["active"]]);
     expect(recorded.some((q) => q.table === "projects_assignment")).toBe(false);
 
     const p1 = result.current.data!.find((p) => p.id === 1)!;
@@ -154,18 +166,54 @@ describe("useProjectsWithTranslators", () => {
       { ...user, short_name: "AN", assignment_status: "claimed", avatar: null, done_message: null },
     ]);
     expect(p1).not.toHaveProperty("projects_assignment");
+    expect(p1).not.toHaveProperty("sap_first");
+  });
+
+  it("loads active and to-review projects in one request for Manage Projects", async () => {
+    const { result } = renderHook(() => useProjectsWithTranslators(false, true, "management"), {
+      wrapper,
+    });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    const listQueries = recorded.filter(
+      (q) => q.table === "projects" && q.filters.some(([, column]) => column === "status")
+    );
+    expect(listQueries).toHaveLength(1);
+    expect(listQueries[0].filters).toContainEqual(["in", "status", ["active", "pending_review"]]);
+  });
+
+  it("shows the list without waiting for the exclusions", async () => {
+    let releaseExclusions = () => {};
+    blocked = {
+      instruction_exclusions_v2: new Promise<void>((done) => (releaseExclusions = done)),
+    };
+    const { result } = renderHook(() => useProjectsWithTranslators(false, true), { wrapper });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data!.find((p) => p.id === 2)!.sap_instructions).toEqual([
+      entry("Visible first"),
+    ]);
+    releaseExclusions();
   });
 
   it("only loads SAP data for projects without manual instructions", async () => {
     const { result } = renderHook(() => useProjectsWithTranslators(false, true), { wrapper });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
-    const firstEntryQuery = recorded.find((q) => q.select.includes("sap_first"))!;
-    expect(firstEntryQuery.filters).toContainEqual(["in", "id", [2, 3, 4, 5]]);
+    // First entries come with the list: no separate request for them
+    expect(
+      recorded.filter((q) => q.table === "projects" && q.select.includes("sap_first"))
+    ).toHaveLength(1);
+    expect(recorded.some((q) => q.table === "instruction_exclusions_v2")).toBe(true);
 
-    // Only the projects whose first entry is excluded need the full array
+    // Only the projects whose first entry is excluded need the full array (after the list)
+    await waitFor(() =>
+      expect(recorded.some((q) => q.select === "id, sap_instructions")).toBe(true)
+    );
     const fullQuery = recorded.find((q) => q.select === "id, sap_instructions")!;
     expect(fullQuery.filters).toContainEqual(["in", "id", [3, 4]]);
+    await waitFor(() =>
+      expect(result.current.data!.find((p) => p.id === 3)!.sap_instructions).toEqual(sapByProject[3])
+    );
 
     const byId = new Map(result.current.data!.map((p) => [p.id, p]));
     expect(byId.get(1)!.sap_instructions).toBeNull();
@@ -176,7 +224,9 @@ describe("useProjectsWithTranslators", () => {
 
   it("produces the same previews as the full data would", async () => {
     const { result } = renderHook(() => useProjectsWithTranslators(false, true), { wrapper });
-    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    await waitFor(() =>
+      expect(result.current.data?.find((p) => p.id === 3)?.sap_instructions).toEqual(sapByProject[3])
+    );
 
     const exclusionSet = new Set(["boilerplate"]);
     for (const project of result.current.data!) {
@@ -211,7 +261,9 @@ describe("useProjectsWithTranslators", () => {
       ["range", 1000, 1999],
       ["range", 2000, 2999],
     ]);
-    expect(recorded.every((q) => q.filters.some((f) => f[0] === "eq" && f[2] === "complete"))).toBe(true);
+    expect(
+      recorded.every((q) => q.filters.some((f) => f[0] === "in" && f[1] === "status" && (f[2] as string[]).join() === "complete"))
+    ).toBe(true);
     // Completed lists load SAP previews per visible page instead
     expect(recorded.some((q) => q.select.includes("sap"))).toBe(false);
     expect(result.current.data!.every((p) => p.sap_instructions === null)).toBe(true);
@@ -222,6 +274,7 @@ describe("useSapInstructionPreviews", () => {
   beforeEach(() => {
     recorded.length = 0;
     resolve = defaultResolver;
+    blocked = {};
   });
 
   it("fills previews for the visible rows only, matching the full data", async () => {

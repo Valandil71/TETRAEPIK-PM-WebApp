@@ -5,8 +5,16 @@
  * and makes it easier to invalidate related queries.
  */
 
-/** Project status a project list is filtered by. */
-export type ProjectListStatus = 'active' | 'complete' | 'pending_review';
+/**
+ * What a project list is filtered by: one project status, or "management" for Manage Projects
+ * (active and still-to-review projects, fetched in one request).
+ */
+export type ProjectListStatus = 'active' | 'complete' | 'management';
+
+/** The project statuses a list contains (realtime invalidation matches changes against them). */
+export function getProjectListStatuses(listStatus: ProjectListStatus): string[] {
+  return listStatus === 'management' ? ['active', 'pending_review'] : [listStatus];
+}
 
 export const queryKeys = {
   // User-related queries

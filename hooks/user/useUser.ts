@@ -11,16 +11,22 @@ export function useUser() {
   const { data: user, isLoading: loading } = useQuery({
     queryKey: queryKeys.user(),
     queryFn: async (): Promise<User | null> => {
-      const { data: userData } = await supabase.auth.getUser();
-      
-      if (!userData.user) {
+      // The session is read locally (no round trip to the auth server, which getUser makes).
+      // It is still trusted: the proxy checks it, and the database validates the JWT on every
+      // query, so a tampered session cannot read a profile it should not.
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      const authUser = session?.user;
+
+      if (!authUser) {
         return null;
       }
 
       const { data: userProfile, error } = await supabase
         .from('users')
         .select('id, name, email, role, C_user, TE_user, short_name, avatar, custom_avatar, theme_preference, expansion_mode')
-        .eq('id', userData.user.id)
+        .eq('id', authUser.id)
         .single();
 
       if (error) {
@@ -30,7 +36,7 @@ export function useUser() {
       // Get email from auth user (it's the source of truth)
       return {
         ...userProfile,
-        email: userData.user.email || userProfile.email || '',
+        email: authUser.email || userProfile.email || '',
       };
     },
     staleTime: 5 * 60 * 1000, // 5 minutes

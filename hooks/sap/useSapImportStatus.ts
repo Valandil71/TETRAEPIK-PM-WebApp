@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, type UseQueryOptions } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/queryKeys";
 import { fetchApi } from "@/lib/api/fetchApi";
 
@@ -18,7 +18,7 @@ export interface SapImportStatusResponse {
 
 interface UseSapImportStatusOptions {
   enabled?: boolean;
-  refetchInterval?: number | false;
+  refetchInterval?: UseQueryOptions<SapImportStatusResponse>["refetchInterval"];
 }
 
 export function useSapImportStatus(options: UseSapImportStatusOptions = {}) {

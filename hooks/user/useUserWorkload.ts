@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { useUsers } from '@/hooks/user/useUsers';
 import { useProjectsWithTranslators } from "@/hooks/project/useProjectsWithTranslators";
+import type { ProjectListStatus } from "@/lib/queryKeys";
 
 export interface ProjectTranslatorInfo {
   id: string;
@@ -80,9 +81,17 @@ function getNextWeekWorkingDays(): number {
   return countWorkingDays(now, nextWeek);
 }
 
-export function useUserWorkload() {
+/**
+ * @param listStatus The project list to count from. Manage Projects passes its own list
+ * ("management") so the counts reuse it instead of fetching the active list separately.
+ */
+export function useUserWorkload(listStatus: ProjectListStatus = "active") {
   const { data: users = [], isLoading: usersLoading } = useUsers();
-  const { data: projects = [], isLoading: projectsLoading } = useProjectsWithTranslators(false, true);
+  const { data: projects = [], isLoading: projectsLoading } = useProjectsWithTranslators(
+    false,
+    true,
+    listStatus
+  );
 
   const workloads = useMemo(() => {
     const workloadMap = new Map<string, UserWorkload>();

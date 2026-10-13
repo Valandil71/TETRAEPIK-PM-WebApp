@@ -71,23 +71,50 @@ export async function loadSapInstructionPreviews(
   const previews = new Map<number, SapInstructionEntry[] | null>();
   if (blankInstructionIds.length === 0) return previews;
 
-  const firstEntries = await fetchInChunks<{ id: number; sap_first: SapInstructionEntry | null }>(
-    blankInstructionIds,
-    (ids) =>
-      supabase
-        .from('projects')
-        .select('id, sap_first:sap_instructions->0')
-        .in('id', ids)
-        .not('sap_instructions', 'is', null)
+  const firstEntries = await fetchInChunks<SapFirstEntry>(blankInstructionIds, (ids) =>
+    supabase
+      .from('projects')
+      .select('id, sap_first:sap_instructions->0')
+      .in('id', ids)
+      .not('sap_instructions', 'is', null)
   );
   if (firstEntries.length === 0) return previews;
 
-  const exclusionSet = toInstructionExclusionSet(
+  return buildSapInstructionPreviews(
+    supabase,
+    firstEntries,
+    await fetchInstructionExclusionSet(supabase, queryClient)
+  );
+}
+
+/** Active exclusions, cached like the Settings list (queryKeys.instructionExclusions). */
+export async function fetchInstructionExclusionSet(
+  supabase: SupabaseClient,
+  queryClient: QueryClient
+): Promise<Set<string>> {
+  return toInstructionExclusionSet(
     await queryClient.fetchQuery({
       queryKey: queryKeys.instructionExclusions(),
       queryFn: () => fetchInstructionExclusions(supabase),
     })
   );
+}
+
+export interface SapFirstEntry {
+  id: number;
+  sap_first: SapInstructionEntry | null;
+}
+
+/**
+ * Turns the first SAP entry of each project into its preview; projects whose first entry is
+ * excluded get their full array (one extra request, only when that happens).
+ */
+export async function buildSapInstructionPreviews(
+  supabase: SupabaseClient,
+  firstEntries: SapFirstEntry[],
+  exclusionSet: Set<string>
+): Promise<Map<number, SapInstructionEntry[] | null>> {
+  const previews = new Map<number, SapInstructionEntry[] | null>();
   const needFullIds: number[] = [];
   for (const row of firstEntries) {
     const preview = pickSapInstructionPreview(row.sap_first, exclusionSet);

@@ -11,8 +11,8 @@ import {
 } from "react";
 import { useQueryClient, QueryClient } from "@tanstack/react-query";
 import { useSupabase } from "@/hooks/core/useSupabase";
-import { queryKeys } from "@/lib/queryKeys";
-import type { RealtimeChannel } from "@supabase/supabase-js";
+import { getProjectListStatuses, queryKeys, type ProjectListStatus } from "@/lib/queryKeys";
+import type { RealtimeChannel, Session } from "@supabase/supabase-js";
 import type { Query } from "@tanstack/react-query";
 import type { ProjectWithTranslators } from "@/types/project";
 
@@ -56,9 +56,9 @@ interface RealtimeProviderProps {
 
 // ─── Handlers (pure functions, no hooks) ─────────────────────────────────────
 
-/** Status a project list query is filtered by (see queryKeys.projectsWithTranslators). */
-function getListStatus(query: Query): unknown {
-  return query.queryKey[3];
+/** Project statuses a list query contains (see queryKeys.projectsWithTranslators). */
+function getListStatuses(query: Query): string[] {
+  return getProjectListStatuses(query.queryKey[3] as ProjectListStatus);
 }
 
 /**
@@ -75,7 +75,8 @@ export function invalidateProjectListsForStatuses(
   const refreshAll = known.length === 0;
   queryClient.invalidateQueries({
     queryKey: queryKeys.projectsWithTranslators(),
-    predicate: (query) => refreshAll || known.includes(getListStatus(query) as string),
+    predicate: (query) =>
+      refreshAll || getListStatuses(query).some((status) => known.includes(status)),
   });
 }
 
@@ -177,10 +178,11 @@ export function RealtimeProvider({ children }: RealtimeProviderProps) {
   const importReportListenersRef = useRef<Set<() => void>>(new Set());
   const currentUserIdRef = useRef<string | null>(null);
 
-  // Cache current user ID
+  // Cache current user ID (read from the local session: getUser would add a round trip that
+  // also holds the auth lock, delaying every other Supabase request on page load)
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }: { data: { user: { id: string } | null } }) => {
-      currentUserIdRef.current = data.user?.id ?? null;
+    supabase.auth.getSession().then(({ data }: { data: { session: Session | null } }) => {
+      currentUserIdRef.current = data.session?.user.id ?? null;
     });
   }, [supabase]);
 

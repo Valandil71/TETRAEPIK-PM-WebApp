@@ -46,17 +46,17 @@ export function useImportReports(userId: string | null) {
     queryFn: async (): Promise<ImportReport[]> => {
       if (!userId) return [];
 
+      // Only the reports this user has not acknowledged yet (filtered in the database, so the
+      // ~100 acknowledged ones are not downloaded on every page load)
       const { data, error } = await supabase
         .from("import_reports")
         .select("*")
+        .not("acknowledged_by", "cs", `{${userId}}`)
         .order("created_at", { ascending: false });
 
       if (error) throw new Error(error.message);
 
-      // Filter to only unacknowledged reports for this user
-      return (data || []).filter(
-        (r: ImportReport) => !r.acknowledged_by?.includes(userId)
-      );
+      return (data || []) as ImportReport[];
     },
     enabled: !!userId,
   });

@@ -41,6 +41,23 @@ describe("invalidateProjectListsForStatuses", () => {
     expect(invalidated()).toEqual([true, true, true]);
   });
 
+  it("refreshes the Manage Projects list for active and to-review changes only", () => {
+    const queryClient = new QueryClient();
+    const managementList = queryKeys.projectsWithTranslators(false, true, "management");
+    const isInvalidated = () => queryClient.getQueryState(managementList)?.isInvalidated;
+
+    queryClient.setQueryData(managementList, [{ id: 1 }]);
+    invalidateProjectListsForStatuses(queryClient, ["complete", "complete"]);
+    expect(isInvalidated()).toBe(false);
+
+    invalidateProjectListsForStatuses(queryClient, ["active", "pending_review"]);
+    expect(isInvalidated()).toBe(true);
+
+    queryClient.setQueryData(managementList, [{ id: 1 }]);
+    invalidateProjectListsForStatuses(queryClient, ["pending_review", "pending_review"]);
+    expect(isInvalidated()).toBe(true);
+  });
+
   it("refreshes every list when the payload has no status", () => {
     const { queryClient, invalidated } = setup();
     invalidateProjectListsForStatuses(queryClient, [undefined, undefined]);

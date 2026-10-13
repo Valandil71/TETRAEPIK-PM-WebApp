@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { X, Loader2, AlertCircle, Download, FileDown, UserPlus, CheckCircle, ClipboardCheck } from "lucide-react";
 import { useUser } from "@/hooks/user/useUser";
 import { useProjectsWithTranslators } from "@/hooks/project/useProjectsWithTranslators";
+import type { ProjectWithTranslators } from "@/types/project";
 import {
   formatSapImportCooldownMessage,
   useSapImportStatus,
@@ -29,7 +30,7 @@ import { Button } from "@/components/ui/button";
 import { RouteId } from "@/lib/roleAccess";
 import { queryKeys } from "@/lib/queryKeys";
 import { Card, CardContent } from "@/components/ui/card";
-import { createBrowserClient } from "@supabase/ssr";
+import { useSupabase } from "@/hooks/core/useSupabase";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { getUserFriendlyError } from "@/utils/toastHelpers";
@@ -37,7 +38,7 @@ import { useDefaultFilters } from "@/hooks/settings/useDefaultFilters";
 import { useProjectFilters } from "@/hooks/project/useProjectFilters";
 import { useManagementPageStore } from "@/lib/stores/useManagementPageStore";
 import { useLayoutStore } from "@/lib/stores/useLayoutStore";
-import { compareProjectsByClosestDeadline, groupProjectsForDisplay } from "@/lib/projectGrouping";
+import { groupProjectsForDisplay } from "@/lib/projectGrouping";
 import { categorizeManagementProjects } from "@/lib/projects/managementTabs";
 import { markProjectsReviewed } from "@/lib/projects/reviewStatus";
 import { MarkReviewedDialog } from "@/components/management/MarkReviewedDialog";
@@ -61,6 +62,9 @@ import {
   restoreWindowScrollY,
 } from "@/utils/scrollRestoration";
 
+// Stable fallback while loading, so the memos below do not recompute on every render
+const EMPTY_PROJECTS: ProjectWithTranslators[] = [];
+
 export default function ProjectManagementPage() {
   return (
     <RoleGuard routeId={RouteId.MANAGEMENT}>
@@ -75,24 +79,19 @@ function ProjectManagementContent() {
   const {
     data: sapImportStatus,
     refetch: refetchSapImportStatus,
-  } = useSapImportStatus({ refetchInterval: 5000 });
+  } = useSapImportStatus({
+    // Status changes arrive over realtime (RealtimeProvider); polling is only a fallback for
+    // spotting the end of a running import.
+    refetchInterval: (query) => (query.state.data?.status === "running" ? 5000 : false),
+  });
   const queryClient = useQueryClient();
-
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseKey =
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY ??
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!supabaseUrl || !supabaseKey) {
-    throw new Error("Missing Supabase environment variables.");
-  }
 
   const isSapImportRunning = sapImportStatus?.status === "running";
 
   // Measure the sticky filter bar so the sticky table header can pin below it.
   const { ref: filtersRef, offset: headerOffset } = useStickyHeaderOffset();
 
-  const supabase = createBrowserClient(supabaseUrl, supabaseKey);
+  const supabase = useSupabase();
 
   const handleOpenSapImportDialog = async () => {
     const latestStatus = await refetchSapImportStatus();
@@ -231,25 +230,13 @@ function ProjectManagementContent() {
   }>({ open: false, project: null });
 
   // Fetch all projects (showAll = true to show all projects for all users): the active ones and
-  // the ones still to be reviewed (imported from SAP without lines/words).
+  // the ones still to be reviewed (imported from SAP without lines/words), in one request,
+  // closest deadline first.
   const {
-    data: activeProjects = [],
-    isLoading: activeLoading,
-    error: activeError,
-  } = useProjectsWithTranslators(false, true);
-  const {
-    data: toReviewProjects = [],
-    isLoading: toReviewLoading,
-    error: toReviewError,
-  } = useProjectsWithTranslators(false, true, "pending_review");
-  const projectsLoading = activeLoading || toReviewLoading;
-  const projectsError = activeError ?? toReviewError;
-
-  // One list, closest deadline first (each query is already sorted that way)
-  const allProjects = useMemo(
-    () => [...activeProjects, ...toReviewProjects].sort(compareProjectsByClosestDeadline),
-    [activeProjects, toReviewProjects]
-  );
+    data: allProjects = EMPTY_PROJECTS,
+    isLoading: projectsLoading,
+    error: projectsError,
+  } = useProjectsWithTranslators(false, true, "management");
 
   // Shared filter state + logic
   const {
@@ -1045,6 +1032,7 @@ function ProjectManagementContent() {
 
       {/* Modals */}
       <AddTranslatorDialog
+        workloadListStatus="management"
         open={addTranslatorModal.open}
         onOpenChange={(open) =>
           setAddTranslatorModal({
@@ -1126,6 +1114,7 @@ function ProjectManagementContent() {
 
       {/* Bulk add collaborators */}
       <AddTranslatorDialog
+        workloadListStatus="management"
         open={bulkAddTranslatorOpen}
         onOpenChange={setBulkAddTranslatorOpen}
         projectId={0}
@@ -1170,6 +1159,7 @@ function ProjectManagementContent() {
       />
 
       <AddTranslatorDialog
+        workloadListStatus="management"
         open={reviewAssignIds !== null}
         onOpenChange={(open) => {
           if (open) return;
