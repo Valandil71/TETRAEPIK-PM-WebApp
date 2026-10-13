@@ -5,7 +5,6 @@ import { ArrowLeft, Edit, Loader2, Check, X, FilePlus, Info } from "lucide-react
 import { formatProjectName } from "@/utils/formatters";
 import { useEffect, useRef, useState } from "react";
 import { useProject } from "@/hooks/project/useProject";
-import { useColorSettings } from "@/hooks/settings/useColorSettings";
 import { useRoleAccess } from "@/hooks/user/useRoleAccess";
 import { useMyProjects } from "@/hooks/project/useMyProjects";
 import { ProjectDetailsCard } from "@/components/project/ProjectDetailsCard";
@@ -40,7 +39,6 @@ export default function ProjectPage() {
   const projectId = params.id ? Number(params.id) : null;
 
   const { data: project, isLoading, error } = useProject(projectId);
-  const { getSystemColorPreview } = useColorSettings();
   const {
     user,
     loading: userLoading,
@@ -500,13 +498,6 @@ export default function ProjectPage() {
     );
   }
 
-  // Get system color preview for the indicator dot
-  const systemColorPreview = getSystemColorPreview(project.system);
-  const systemColorStyle =
-    systemColorPreview !== "transparent" ?
-      { backgroundColor: systemColorPreview }
-    : undefined;
-
   // Determine translator's assignment status for action buttons
   const assignmentStatus = translatorAssignment?.assignment_status;
   const hasProjectNotes = !!project.project_notes?.trim();
@@ -522,7 +513,6 @@ export default function ProjectPage() {
 
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-4">
-            <div className="w-4 h-4 rounded" style={systemColorStyle} />
             <div>
               <h1 className="text-gray-900 dark:text-white mb-2 text-3xl font-bold">
                 {formatProjectName(project.name)}

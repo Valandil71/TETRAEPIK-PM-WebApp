@@ -2,15 +2,13 @@
 
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { Fragment } from "react";
-import { useColorSettings } from "@/hooks/settings/useColorSettings";
-import { getSystemColorStyle } from "@/utils/projectTableHelpers";
 import { formatProjectName } from "@/utils/formatters";
 import { getInstructionsPreview } from "@/utils/instructionsPreview";
 import { useInstructionExclusions } from "@/hooks/settings/useInstructionExclusions";
 import type { ProjectWithTranslators } from "@/types/project";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { DeadlineDisplay } from "@/components/general/DeadlineDisplay";
-import { ProjectColorLegendTooltip } from "@/components/shared/ProjectColorLegendTooltip";
+import { LanguagePair } from "@/components/shared/LanguagePair";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { ProjectGroup } from "@/lib/projectGrouping";
 import {
@@ -40,11 +38,7 @@ export function InvoicingTable({
   onGroupSelection,
   headerOffset = 0,
 }: InvoicingTableProps) {
-  const { getSystemColorPreview } = useColorSettings();
   const { exclusionSet } = useInstructionExclusions(null);
-
-  const getSystemColorStyleLocal = (system: string) =>
-    getSystemColorStyle(system, getSystemColorPreview);
 
   if (groups.length === 0) {
     return (
@@ -68,9 +62,9 @@ export function InvoicingTable({
           <thead className="sticky z-20" style={{ top: headerOffset }}>
             <tr className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
               <th className="px-6 py-4 w-4 bg-gray-50 dark:bg-gray-900" />
-              <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300 w-12 bg-gray-50 dark:bg-gray-900" />
               <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900">System</th>
               <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900">Project Name</th>
+              <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900">Languages</th>
               <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300 text-center bg-gray-50 dark:bg-gray-900">Invoiced</th>
               <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300 text-center bg-gray-50 dark:bg-gray-900">Paid</th>
               <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900">Collaborator(s)</th>
@@ -140,19 +134,6 @@ export function InvoicingTable({
                           />
                         </td>
                         <td className="px-6 py-4">
-                          <ProjectColorLegendTooltip
-                            status={project.status}
-                            system={project.system}
-                            langIn={project.language_in}
-                            langOut={project.language_out}
-                          >
-                            <div
-                              className="w-3 h-3 rounded"
-                              style={getSystemColorStyleLocal(project.system)}
-                            />
-                          </ProjectColorLegendTooltip>
-                        </td>
-                        <td className="px-6 py-4">
                           <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-sm">
                             {project.system}
                           </span>
@@ -161,6 +142,9 @@ export function InvoicingTable({
                           <span className="text-gray-900 dark:text-white max-w-[280px] block break-words line-clamp-2">
                             {formatProjectName(project.name)}
                           </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <LanguagePair languageIn={project.language_in} languageOut={project.language_out} />
                         </td>
                         <td className="px-6 py-4 text-center">
                           <span

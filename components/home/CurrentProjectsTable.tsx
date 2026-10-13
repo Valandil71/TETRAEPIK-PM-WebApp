@@ -2,10 +2,9 @@
 
 import { useRouter } from "next/navigation";
 import { formatNumber } from "@/utils/formatters";
-import { useColorSettings } from "@/hooks/settings/useColorSettings";
-import { getSystemColorStyle, getLanguageColorStyle, getStatusIcon } from "@/utils/projectTableHelpers";
+import { getStatusIcon } from "@/utils/projectTableHelpers";
 import { ProjectTableBase } from "@/components/shared/ProjectTableBase";
-import { ProjectColorLegendTooltip } from "@/components/shared/ProjectColorLegendTooltip";
+import { LanguagePair } from "@/components/shared/LanguagePair";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { DeadlineDisplay } from "@/components/general/DeadlineDisplay";
 import {
@@ -26,15 +25,8 @@ interface CurrentProjectsTableProps {
 
 export function CurrentProjectsTable({ projects }: CurrentProjectsTableProps) {
   const router = useRouter();
-  const { getSystemColorPreview, getLanguageColorPreview } = useColorSettings();
   const { exclusionSet } = useInstructionExclusions(null);
   const { role, user } = useRoleAccess();
-
-  // Use shared utility functions for color styles
-  const getSystemColorStyleLocal = (system: string) =>
-    getSystemColorStyle(system, getSystemColorPreview);
-  const getLanguageColorStyleLocal = (langIn: string, langOut: string) =>
-    getLanguageColorStyle(langIn, langOut, getLanguageColorPreview);
 
   const handleRowClick = (project: ProjectWithTranslators) => {
     if (role === "employee") {
@@ -58,32 +50,6 @@ export function CurrentProjectsTable({ projects }: CurrentProjectsTableProps) {
 
   const columns = [
     {
-      header: "",
-      className: "w-4",
-      render: (project: ProjectWithTranslators) => (
-        <ProjectColorLegendTooltip
-          status={project.status}
-          system={project.system}
-          langIn={project.language_in}
-          langOut={project.language_out}
-        >
-          <div className="flex flex-col items-center">
-            <div
-              className="w-3 h-3 rounded"
-              style={getSystemColorStyleLocal(project.system)}
-            />
-            <div
-              className="w-3 h-1 mt-0.5"
-              style={getLanguageColorStyleLocal(
-                project.language_in || "",
-                project.language_out || ""
-              )}
-            />
-          </div>
-        </ProjectColorLegendTooltip>
-      ),
-    },
-    {
       header: "System",
       render: (project: ProjectWithTranslators) => (
         <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-gray-900 dark:text-blue-400 text-sm">
@@ -95,6 +61,12 @@ export function CurrentProjectsTable({ projects }: CurrentProjectsTableProps) {
       header: "Project",
       render: (project: ProjectWithTranslators) => (
         <span className="text-gray-900 dark:text-white">{project.name}</span>
+      ),
+    },
+    {
+      header: "Languages",
+      render: (project: ProjectWithTranslators) => (
+        <LanguagePair languageIn={project.language_in} languageOut={project.language_out} />
       ),
     },
     {
@@ -195,6 +167,4 @@ export function CurrentProjectsTable({ projects }: CurrentProjectsTableProps) {
     />
   );
 }
-
-
 

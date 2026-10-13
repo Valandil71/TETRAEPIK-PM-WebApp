@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { Loader2, LogOut, X } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ColorSettings } from "@/components/settings/ColorSettings";
 import { ThemeSettings } from "@/components/settings/ThemeSettings";
 import { GroupExpansionSettings } from "@/components/settings/GroupExpansionSettings";
 import { UserRoleManagement } from "@/components/settings/UserRoleManagement";
@@ -19,7 +18,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 export default function SettingsPage() {
-  const { user, loading, canEditColors } = useRoleAccess();
+  const { user, loading } = useRoleAccess();
   const router = useRouter();
   const queryClient = useQueryClient();
   const [loggingOut, setLoggingOut] = useState(false);
@@ -137,13 +136,6 @@ export default function SettingsPage() {
           userId={user.id}
           availableProjectTypes={projectTypes}
         />
-      )}
-
-      {/* Only show ColorSettings card for admins */}
-      {canEditColors() && (
-        <Card className="p-6">
-          <ColorSettings userRole={user.role} />
-        </Card>
       )}
 
       {/* Logout Section */}

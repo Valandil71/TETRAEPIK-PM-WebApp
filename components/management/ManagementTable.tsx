@@ -4,12 +4,11 @@ import { useRouter } from "next/navigation";
 import { Check, XCircle, MessageSquare, ChevronRight, ChevronDown } from "lucide-react";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { formatNumber, formatProjectName } from "@/utils/formatters";
-import { useColorSettings } from "@/hooks/settings/useColorSettings";
-import { getSystemColorStyle, getLanguageColorStyle, getStatusIcon } from "@/utils/projectTableHelpers";
+import { getStatusIcon } from "@/utils/projectTableHelpers";
 import { ProjectActionsMenu } from "./ProjectActionsMenu";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { DeadlineDisplay } from "@/components/general/DeadlineDisplay";
-import { ProjectColorLegendTooltip } from "@/components/shared/ProjectColorLegendTooltip";
+import { LanguagePair } from "@/components/shared/LanguagePair";
 import {
   Tooltip,
   TooltipContent,
@@ -168,16 +167,10 @@ export function ManagementTable({
   headerOffset = 0,
 }: ManagementTableProps) {
   const router = useRouter();
-  const { getSystemColorPreview, getLanguageColorPreview } = useColorSettings();
   const { exclusionSet } = useInstructionExclusions(null);
   const rememberReturnProject = useManagementPageStore(
     (state) => state.rememberReturnProject
   );
-
-  const getSystemColorStyleLocal = (system: string) =>
-    getSystemColorStyle(system, getSystemColorPreview);
-  const getLanguageColorStyleLocal = (langIn: string, langOut: string) =>
-    getLanguageColorStyle(langIn, langOut, getLanguageColorPreview);
 
   const isSelecting = !!selection?.isActive;
 
@@ -247,6 +240,7 @@ export function ManagementTable({
               <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300 w-4 bg-gray-50 dark:bg-gray-900" />
               <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900">System</th>
               <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900">Project Name</th>
+              <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900">Languages</th>
               <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300 text-right bg-gray-50 dark:bg-gray-900">Lines</th>
               <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300 text-right bg-gray-50 dark:bg-gray-900">Words</th>
               <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900">Collaborator(s)</th>
@@ -276,7 +270,7 @@ export function ManagementTable({
                           </td>
                         );
                       })()}
-                      <td colSpan={isSelecting ? 8 : 9} className="px-6 py-3">
+                      <td colSpan={isSelecting ? 9 : 10} className="px-6 py-3">
                         <button
                           type="button"
                           onClick={() => onToggleGroup(group.key)}
@@ -320,34 +314,14 @@ export function ManagementTable({
                               <div className="absolute left-3 top-1/2 h-px w-3 bg-blue-200/70 dark:bg-blue-800/50" />
                             </>
                           )}
-                          {isSelecting ?
+                          {isSelecting && (
                             <Checkbox
                               checked={isSelected}
                               tabIndex={-1}
                               className="pointer-events-none"
                               aria-label={`Select ${project.name}`}
                             />
-                          : <ProjectColorLegendTooltip
-                            status={project.status}
-                            system={project.system}
-                            langIn={project.language_in}
-                            langOut={project.language_out}
-                          >
-                            <div className="flex flex-col items-center">
-                              <div
-                                className="w-3 h-3 rounded"
-                                style={getSystemColorStyleLocal(project.system)}
-                              />
-                              <div
-                                className="w-3 h-1 mt-0.5"
-                                style={getLanguageColorStyleLocal(
-                                  project.language_in || "",
-                                  project.language_out || ""
-                                )}
-                              />
-                            </div>
-                          </ProjectColorLegendTooltip>
-                          }
+                          )}
                         </td>
                         <td className="px-6 py-4">
                           <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-gray-900 dark:text-blue-400 text-sm">
@@ -358,6 +332,9 @@ export function ManagementTable({
                           <span className="text-gray-900 dark:text-white max-w-[280px] block break-words line-clamp-2">
                             {formatProjectName(project.name)}
                           </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <LanguagePair languageIn={project.language_in} languageOut={project.language_out} />
                         </td>
                         <td className="px-6 py-4 text-right">
                           <div onClick={(e) => e.stopPropagation()}>
@@ -563,21 +540,4 @@ export function ManagementTable({
     </TooltipProvider>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

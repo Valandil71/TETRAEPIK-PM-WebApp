@@ -1,14 +1,12 @@
 "use client";
 
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { useColorSettings } from "@/hooks/settings/useColorSettings";
-import { getSystemColorStyle, getLanguageColorStyle } from "@/utils/projectTableHelpers";
 import { formatProjectName } from "@/utils/formatters";
 import { getInstructionsPreview } from "@/utils/instructionsPreview";
 import { useInstructionExclusions } from "@/hooks/settings/useInstructionExclusions";
 import type { ProjectWithTranslators } from "@/types/project";
 import { DeadlineDisplay } from "@/components/general/DeadlineDisplay";
-import { ProjectColorLegendTooltip } from "@/components/shared/ProjectColorLegendTooltip";
+import { LanguagePair } from "@/components/shared/LanguagePair";
 import type { ProjectGroup } from "@/lib/projectGrouping";
 import { getGroupDisplayName } from "@/lib/projectGrouping";
 
@@ -26,13 +24,7 @@ export function ConcludedCard({
   onToggleGroup,
   onCardClick,
 }: ConcludedCardProps) {
-  const { getSystemColorPreview, getLanguageColorPreview } = useColorSettings();
   const { exclusionSet } = useInstructionExclusions(null);
-
-  const getSystemColorStyleLocal = (system: string) =>
-    getSystemColorStyle(system, getSystemColorPreview);
-  const getLanguageColorStyleLocal = (langIn: string, langOut: string) =>
-    getLanguageColorStyle(langIn, langOut, getLanguageColorPreview);
 
   const renderProjectCard = (project: ProjectWithTranslators) => (
     <div
@@ -41,27 +33,6 @@ export function ConcludedCard({
       onClick={(e) => onCardClick(project.id, e)}
     >
       <div className="flex items-start gap-4 mb-4">
-        <ProjectColorLegendTooltip
-          status={project.status}
-          system={project.system}
-          langIn={project.language_in}
-          langOut={project.language_out}
-          className="shrink-0 mt-1"
-        >
-          <div className="flex flex-col items-center">
-            <div
-              className="w-3 h-3 rounded"
-              style={getSystemColorStyleLocal(project.system)}
-            />
-            <div
-              className="w-3 h-1 mt-0.5"
-              style={getLanguageColorStyleLocal(
-                project.language_in || "",
-                project.language_out || ""
-              )}
-            />
-          </div>
-        </ProjectColorLegendTooltip>
         <div className="flex-1 min-w-0">
           <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-sm mb-2">
             {project.system}
@@ -78,9 +49,11 @@ export function ConcludedCard({
           <span className="text-gray-500 dark:text-gray-400 text-sm">
             Languages
           </span>
-          <span className="text-gray-700 dark:text-gray-300 text-sm">
-            {project.language_in} → {project.language_out}
-          </span>
+          <LanguagePair
+            languageIn={project.language_in}
+            languageOut={project.language_out}
+            className="text-sm"
+          />
         </div>
         <div className="flex justify-between items-center">
           <span className="text-gray-500 dark:text-gray-400 text-sm">

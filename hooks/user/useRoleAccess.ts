@@ -6,7 +6,6 @@ import type { UserRole } from "@/types/user";
 import {
   canAccessRoute as canAccessRouteHelper,
   canManageAssignments as canManageAssignmentsHelper,
-  canEditColors as canEditColorsHelper,
   allowedProjectActions as allowedProjectActionsHelper,
   getNavItemsForRole,
   isTranslator as isTranslatorHelper,
@@ -27,7 +26,6 @@ export interface UseRoleAccessReturn {
   /** Check if user can manage assignments (add/remove translators) */
   canManageAssignments: () => boolean;
   /** Check if user can edit color settings */
-  canEditColors: () => boolean;
   /** Get project actions available for user */
   allowedProjectActions: () => ReturnType<typeof allowedProjectActionsHelper>;
   /** Get navigation items available for user */
@@ -60,10 +58,6 @@ export function useRoleAccess(): UseRoleAccessReturn {
     return () => canManageAssignmentsHelper(role);
   }, [role]);
 
-  const canEditColors = useMemo(() => {
-    return () => canEditColorsHelper(role);
-  }, [role]);
-
   const allowedProjectActions = useMemo(() => {
     return () => allowedProjectActionsHelper(role);
   }, [role]);
@@ -82,7 +76,6 @@ export function useRoleAccess(): UseRoleAccessReturn {
     loading,
     canAccessRoute,
     canManageAssignments,
-    canEditColors,
     allowedProjectActions,
     allowedNavItems,
     isTranslator,

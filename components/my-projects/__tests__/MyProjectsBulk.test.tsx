@@ -9,13 +9,6 @@ import type { ProjectAssignment } from "@/types/project-assignment";
 
 const push = vi.fn();
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
-vi.mock("@/hooks/settings/useColorSettings", () => ({
-  useColorSettings: () => ({
-    getSystemColorPreview: () => "transparent",
-    getLanguageColorPreview: () => "transparent",
-    getProjectColorLegend: () => "",
-  }),
-}));
 
 function assignment(id: number, name: string): ProjectAssignment {
   return {

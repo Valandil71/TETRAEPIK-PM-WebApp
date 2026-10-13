@@ -10,12 +10,11 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { formatNumber, formatProjectName } from "@/utils/formatters";
-import { useColorSettings } from "@/hooks/settings/useColorSettings";
-import { getSystemColorStyle, getLanguageColorStyle, getStatusIcon } from "@/utils/projectTableHelpers";
+import { getStatusIcon } from "@/utils/projectTableHelpers";
 import { ProjectActionsMenu } from "./ProjectActionsMenu";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { DeadlineDisplay } from "@/components/general/DeadlineDisplay";
-import { ProjectColorLegendTooltip } from "@/components/shared/ProjectColorLegendTooltip";
+import { LanguagePair } from "@/components/shared/LanguagePair";
 import {
   Tooltip,
   TooltipContent,
@@ -166,16 +165,10 @@ export function ManagementCard({
   onInstructionsClick,
 }: ManagementCardProps) {
   const router = useRouter();
-  const { getSystemColorPreview, getLanguageColorPreview } = useColorSettings();
   const { exclusionSet } = useInstructionExclusions(null);
   const rememberReturnProject = useManagementPageStore(
     (state) => state.rememberReturnProject
   );
-
-  const getSystemColorStyleLocal = (system: string) =>
-    getSystemColorStyle(system, getSystemColorPreview);
-  const getLanguageColorStyleLocal = (langIn: string, langOut: string) =>
-    getLanguageColorStyle(langIn, langOut, getLanguageColorPreview);
 
   const isSelecting = !!selection?.isActive;
 
@@ -235,38 +228,22 @@ export function ManagementCard({
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center">
-          {isSelecting ?
+          {isSelecting && (
             <Checkbox
               checked={isSelected}
               tabIndex={-1}
               className="pointer-events-none mr-3"
               aria-label={`Select ${project.name}`}
             />
-          : <ProjectColorLegendTooltip
-            status={project.status}
-            system={project.system}
-            langIn={project.language_in}
-            langOut={project.language_out}
-            className="mr-2"
-          >
-            <div className="flex flex-col items-center">
-              <div
-                className="w-3 h-3 rounded"
-                style={getSystemColorStyleLocal(project.system)}
-              />
-              <div
-                className="w-3 h-1 mt-0.5"
-                style={getLanguageColorStyleLocal(
-                  project.language_in || "",
-                  project.language_out || ""
-                )}
-              />
-            </div>
-          </ProjectColorLegendTooltip>
-          }
+          )}
           <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-xs md:text-sm">
             {project.system}
           </span>
+          <LanguagePair
+            languageIn={project.language_in}
+            languageOut={project.language_out}
+            className="ml-2 text-xs md:text-sm"
+          />
         </div>
         <ProjectActionsMenu
           projectId={project.id}
@@ -496,15 +473,4 @@ export function ManagementCard({
     </TooltipProvider>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
 

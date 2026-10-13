@@ -34,7 +34,6 @@ export type { SyncSapProjectsRequest, SyncSapProjectsResponse } from './sap/useS
 export { useImportReports } from './sap/useImportReports';
 
 // Settings hooks
-export { useColorSettings } from './settings/useColorSettings';
 export { useDefaultFilters } from './settings/useDefaultFilters';
 export { useGroupExpansionPreference } from './settings/useGroupExpansionPreference';
 export { useInstructionExclusions } from './settings/useInstructionExclusions';

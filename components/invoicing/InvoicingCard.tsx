@@ -1,14 +1,12 @@
 "use client";
 
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { useColorSettings } from "@/hooks/settings/useColorSettings";
-import { getSystemColorStyle } from "@/utils/projectTableHelpers";
 import { formatProjectName } from "@/utils/formatters";
 import { getInstructionsPreview } from "@/utils/instructionsPreview";
 import { useInstructionExclusions } from "@/hooks/settings/useInstructionExclusions";
 import type { ProjectWithTranslators } from "@/types/project";
 import { DeadlineDisplay } from "@/components/general/DeadlineDisplay";
-import { ProjectColorLegendTooltip } from "@/components/shared/ProjectColorLegendTooltip";
+import { LanguagePair } from "@/components/shared/LanguagePair";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { ProjectGroup } from "@/lib/projectGrouping";
 import {
@@ -33,11 +31,7 @@ export function InvoicingCard({
   onSelection,
   onGroupSelection,
 }: InvoicingCardProps) {
-  const { getSystemColorPreview } = useColorSettings();
   const { exclusionSet } = useInstructionExclusions(null);
-
-  const getSystemColorStyleLocal = (system: string) =>
-    getSystemColorStyle(system, getSystemColorPreview);
 
   const renderProjectCard = (project: ProjectWithTranslators) => {
     const isSelected = selectedProjects.has(project.id);
@@ -68,22 +62,15 @@ export function InvoicingCard({
             className="outline-style w-4 h-4 mt-1 rounded cursor-pointer"
             onClick={(e) => e.stopPropagation()}
           />
-          <ProjectColorLegendTooltip
-            status={project.status}
-            system={project.system}
-            langIn={project.language_in}
-            langOut={project.language_out}
-            className="shrink-0 mt-1"
-          >
-            <div
-              className="w-3 h-3 rounded"
-              style={getSystemColorStyleLocal(project.system)}
-            />
-          </ProjectColorLegendTooltip>
           <div className="flex-1 min-w-0">
             <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-sm mb-2">
               {project.system}
             </span>
+            <LanguagePair
+              languageIn={project.language_in}
+              languageOut={project.language_out}
+              className="ml-2 text-sm"
+            />
           </div>
         </div>
 

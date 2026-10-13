@@ -3,10 +3,8 @@
 import { useRouter } from "next/navigation";
 import { Check, Info, X } from "lucide-react";
 import { formatNumber, formatProjectName } from "@/utils/formatters";
-import { useColorSettings } from "@/hooks/settings/useColorSettings";
-import { getSystemColorStyle, getLanguageColorStyle } from "@/utils/projectTableHelpers";
 import { DeadlineDisplay } from "@/components/general/DeadlineDisplay";
-import { ProjectColorLegendTooltip } from "@/components/shared/ProjectColorLegendTooltip";
+import { LanguagePair } from "@/components/shared/LanguagePair";
 import type { ProjectAssignment } from "@/types/project-assignment";
 import type { ProjectSelection } from "@/hooks/project/useProjectSelection";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -33,7 +31,6 @@ export function MyProjectsCard({
   selection,
 }: MyProjectsCardProps) {
   const router = useRouter();
-  const { getSystemColorPreview, getLanguageColorPreview } = useColorSettings();
 
   const isSelecting = !!selection?.isActive;
   const showBulkMenu = !isSelecting && projects.length > 1;
@@ -45,12 +42,6 @@ export function MyProjectsCard({
     }
     router.push(`/project/${projectId}`);
   };
-
-  // Use shared utility functions for color styles
-  const getSystemColorStyleLocal = (system: string) =>
-    getSystemColorStyle(system, getSystemColorPreview);
-  const getLanguageColorStyleLocal = (langIn: string, langOut: string) =>
-    getLanguageColorStyle(langIn, langOut, getLanguageColorPreview);
 
   // Sort projects by due date (earliest first)
   const sortedProjects = [...projects].sort((a, b) => {
@@ -88,38 +79,22 @@ export function MyProjectsCard({
             {...(isSelecting ? selection.getItemProps(project.id) : {})}
           >
             <div className="flex items-center mb-4">
-              {isSelecting ?
+              {isSelecting && (
                 <Checkbox
                   checked={isSelected}
                   tabIndex={-1}
                   className="pointer-events-none mr-3"
                   aria-label={`Select ${project.name}`}
                 />
-              : <ProjectColorLegendTooltip
-                status={project.status}
-                system={project.system}
-                langIn={project.language_in}
-                langOut={project.language_out}
-                className="shrink-0 mr-2"
-              >
-                <div className="flex flex-col items-center">
-                  <div
-                    className="w-3 h-3 rounded"
-                    style={getSystemColorStyleLocal(project.system)}
-                  />
-                  <div
-                    className="w-3 h-1 mt-0.5"
-                    style={getLanguageColorStyleLocal(
-                      project.language_in || "",
-                      project.language_out || ""
-                    )}
-                  />
-                </div>
-              </ProjectColorLegendTooltip>
-              }
+              )}
               <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-xs md:text-sm">
                 {project.system}
               </span>
+              <LanguagePair
+                languageIn={project.language_in}
+                languageOut={project.language_out}
+                className="ml-2 text-xs md:text-sm"
+              />
               {showBulkMenu && (
                 <div className="ml-auto">
                   <MyProjectsActionsMenu
@@ -206,6 +181,4 @@ export function MyProjectsCard({
     </div>
   );
 }
-
-
 

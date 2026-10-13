@@ -141,13 +141,6 @@ export function getNavItemsForRole(role: UserRole | undefined): NavItem[] {
 }
 
 /**
- * Check if a role can edit color settings (admin only)
- */
-export function canEditColors(role: UserRole | undefined): boolean {
-  return role === "admin";
-}
-
-/**
  * Check if a role is a translator (employee)
  */
 export function isTranslator(role: UserRole | undefined): boolean {

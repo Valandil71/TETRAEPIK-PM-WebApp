@@ -1,30 +1,6 @@
 import type { Config } from "tailwindcss";
 import tailwindcssAnimate from "tailwindcss-animate";
 
-// Generate safelist for all Tailwind color classes
-const colors = [
-  "slate", "gray", "zinc", "neutral", "stone",
-  "red", "orange", "amber", "yellow", "lime",
-  "green", "emerald", "teal", "cyan", "sky",
-  "blue", "indigo", "violet", "purple", "fuchsia",
-  "pink", "rose",
-];
-const shades = ["50", "100", "200", "300", "400", "500", "600", "700", "800", "900", "950"];
-
-const colorSafelist: string[] = [];
-
-// Add special colors
-colorSafelist.push("bg-white", "bg-black", "bg-transparent");
-colorSafelist.push("text-white", "text-black", "text-transparent");
-
-// Add all color/shade combinations for bg and text
-colors.forEach((color) => {
-  shades.forEach((shade) => {
-    colorSafelist.push(`bg-${color}-${shade}`);
-    colorSafelist.push(`text-${color}-${shade}`);
-  });
-});
-
 const config: Config = {
   darkMode: ["class"],
   content: [
@@ -32,7 +8,6 @@ const config: Config = {
     "./components/**/*.{js,ts,jsx,tsx}",
   ],
   safelist: [
-    ...colorSafelist,
     "text-green-600",
     "text-blue-600",
     "text-red-600",

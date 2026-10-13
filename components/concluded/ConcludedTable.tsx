@@ -2,15 +2,13 @@
 
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { Fragment } from "react";
-import { useColorSettings } from "@/hooks/settings/useColorSettings";
-import { getSystemColorStyle, getLanguageColorStyle } from "@/utils/projectTableHelpers";
 import { formatProjectName } from "@/utils/formatters";
 import { getInstructionsPreview } from "@/utils/instructionsPreview";
 import { useInstructionExclusions } from "@/hooks/settings/useInstructionExclusions";
 import type { ProjectWithTranslators } from "@/types/project";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { DeadlineDisplay } from "@/components/general/DeadlineDisplay";
-import { ProjectColorLegendTooltip } from "@/components/shared/ProjectColorLegendTooltip";
+import { LanguagePair } from "@/components/shared/LanguagePair";
 import type { ProjectGroup } from "@/lib/projectGrouping";
 import { getGroupDisplayName } from "@/lib/projectGrouping";
 
@@ -32,13 +30,7 @@ export function ConcludedTable({
   onRowClick,
   headerOffset = 0,
 }: ConcludedTableProps) {
-  const { getSystemColorPreview, getLanguageColorPreview } = useColorSettings();
   const { exclusionSet } = useInstructionExclusions(null);
-
-  const getSystemColorStyleLocal = (system: string) =>
-    getSystemColorStyle(system, getSystemColorPreview);
-  const getLanguageColorStyleLocal = (langIn: string, langOut: string) =>
-    getLanguageColorStyle(langIn, langOut, getLanguageColorPreview);
 
   if (groups.length === 0) {
     return (
@@ -56,7 +48,6 @@ export function ConcludedTable({
         <table className="w-full text-sm">
           <thead className="sticky z-20" style={{ top: headerOffset }}>
             <tr className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
-              <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300 w-12 bg-gray-50 dark:bg-gray-900" />
               <th className="px-6 py-4 text-left text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900">
                 System
               </th>
@@ -86,7 +77,7 @@ export function ConcludedTable({
                 <Fragment key={group.key}>
                   {isGrouped && (
                     <tr className="border-b border-gray-200 dark:border-gray-700 bg-blue-50/60 dark:bg-blue-900/10">
-                      <td colSpan={7} className="px-6 py-3">
+                      <td colSpan={6} className="px-6 py-3">
                         <button
                           type="button"
                           onClick={() => onToggleGroup(group.key)}
@@ -118,28 +109,6 @@ export function ConcludedTable({
                         onClick={(e) => onRowClick(project.id, e)}
                       >
                         <td className="px-6 py-4">
-                          <ProjectColorLegendTooltip
-                            status={project.status}
-                            system={project.system}
-                            langIn={project.language_in}
-                            langOut={project.language_out}
-                          >
-                            <div className="flex flex-col items-center">
-                              <div
-                                className="w-3 h-3 rounded"
-                                style={getSystemColorStyleLocal(project.system)}
-                              />
-                              <div
-                                className="w-3 h-1 mt-0.5"
-                                style={getLanguageColorStyleLocal(
-                                  project.language_in || "",
-                                  project.language_out || ""
-                                )}
-                              />
-                            </div>
-                          </ProjectColorLegendTooltip>
-                        </td>
-                        <td className="px-6 py-4">
                           <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-sm">
                             {project.system}
                           </span>
@@ -149,8 +118,8 @@ export function ConcludedTable({
                             {formatProjectName(project.name)}
                           </span>
                         </td>
-                        <td className="px-6 py-4 text-gray-700 dark:text-gray-300">
-                          {project.language_in} → {project.language_out}
+                        <td className="px-6 py-4">
+                          <LanguagePair languageIn={project.language_in} languageOut={project.language_out} />
                         </td>
                         <td className="px-6 py-4">
                           {project.translators.length > 0 ? (

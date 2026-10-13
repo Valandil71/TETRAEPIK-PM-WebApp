@@ -37,7 +37,6 @@ export const queryKeys = {
   homeManageProjectsCount: () => ['home-manage-projects-count'] as const,
 
   // Settings and configuration
-  colorSettings: () => ['color-settings'] as const,
   availableAvatars: () => ['available-avatars'] as const,
 
   // SAP Integration

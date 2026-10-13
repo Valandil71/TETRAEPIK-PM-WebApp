@@ -3,11 +3,9 @@
 import { useRouter } from "next/navigation";
 import { Check, Info, X } from "lucide-react";
 import { formatNumber, formatProjectName } from "@/utils/formatters";
-import { useColorSettings } from "@/hooks/settings/useColorSettings";
-import { getSystemColorStyle, getLanguageColorStyle } from "@/utils/projectTableHelpers";
 import { ProjectTableBase } from "@/components/shared/ProjectTableBase";
 import { DeadlineDisplay } from "@/components/general/DeadlineDisplay";
-import { ProjectColorLegendTooltip } from "@/components/shared/ProjectColorLegendTooltip";
+import { LanguagePair } from "@/components/shared/LanguagePair";
 import type { ProjectAssignment } from "@/types/project-assignment";
 import type { ProjectSelection } from "@/hooks/project/useProjectSelection";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -34,13 +32,6 @@ export function MyProjectsTable({
   selection,
 }: MyProjectsTableProps) {
   const router = useRouter();
-  const { getSystemColorPreview, getLanguageColorPreview } = useColorSettings();
-
-  // Use shared utility functions for color styles
-  const getSystemColorStyleLocal = (system: string) =>
-    getSystemColorStyle(system, getSystemColorPreview);
-  const getLanguageColorStyleLocal = (langIn: string, langOut: string) =>
-    getLanguageColorStyle(langIn, langOut, getLanguageColorPreview);
 
   const isSelecting = !!selection?.isActive;
   const showBulkMenu = !isSelecting && projects.length > 1;
@@ -72,12 +63,12 @@ export function MyProjectsTable({
   });
 
   const columns = [
-    {
-      header: "",
-      className: "w-4",
-      render: (assignment: ProjectAssignment) => {
-        const project = assignment.projects;
-        if (isSelecting) {
+    ...(isSelecting ?
+      [{
+        header: "",
+        className: "w-4",
+        render: (assignment: ProjectAssignment) => {
+          const project = assignment.projects;
           return (
             <Checkbox
               checked={selection.isSelected(project.id)}
@@ -86,31 +77,9 @@ export function MyProjectsTable({
               aria-label={`Select ${project.name}`}
             />
           );
-        }
-        return (
-          <ProjectColorLegendTooltip
-            status={project.status}
-            system={project.system}
-            langIn={project.language_in}
-            langOut={project.language_out}
-          >
-            <div className="flex flex-col items-center">
-              <div
-                className="w-3 h-3 rounded"
-                style={getSystemColorStyleLocal(project.system)}
-              />
-              <div
-                className="w-3 h-1 mt-0.5"
-                style={getLanguageColorStyleLocal(
-                  project.language_in || "",
-                  project.language_out || ""
-                )}
-              />
-            </div>
-          </ProjectColorLegendTooltip>
-        );
-      },
-    },
+        },
+      }]
+    : []),
     {
       header: "System",
       render: (assignment: ProjectAssignment) => {
@@ -128,6 +97,15 @@ export function MyProjectsTable({
         <span className="text-gray-900 dark:text-white max-w-[280px] block break-words line-clamp-2">
           {formatProjectName(assignment.projects.name)}
         </span>
+      ),
+    },
+    {
+      header: "Languages",
+      render: (assignment: ProjectAssignment) => (
+        <LanguagePair
+          languageIn={assignment.projects.language_in}
+          languageOut={assignment.projects.language_out}
+        />
       ),
     },
     {
@@ -263,6 +241,4 @@ export function MyProjectsTable({
     />
   );
 }
-
-
 
