@@ -39,7 +39,7 @@ describe("projectGrouping", () => {
     ]);
   });
 
-  it("groups SAP projects by subproject id in the position of their first appearance", () => {
+  it("keeps the incoming order and splits non-adjacent rows of a subproject", () => {
     const orderedProjects = [
       makeProject(10, "Subproject B", {
         sap_subproject_id: "B",
@@ -61,8 +61,46 @@ describe("projectGrouping", () => {
 
     const groups = groupProjectsForDisplay(orderedProjects);
 
-    expect(groups.map((group) => group.key)).toEqual(["sap:B", "sap:A", "sap:C"]);
-    expect(groups[1].projects.map((project) => project.id)).toEqual([20, 21]);
+    expect(groups.map((group) => group.key)).toEqual([
+      "sap:B",
+      "sap:A",
+      "sap:C",
+      "sap:A#2",
+    ]);
+    expect(groups.map((group) => group.projects.map((project) => project.id))).toEqual([
+      [10],
+      [20],
+      [30],
+      [21],
+    ]);
+  });
+
+  it("groups adjacent rows of the same subproject with unique keys per run", () => {
+    const groups = groupProjectsForDisplay([
+      makeProject(1, "Subproject A", { sap_subproject_id: "A" }),
+      makeProject(2, "Subproject A", { sap_subproject_id: "A" }),
+      makeProject(3, "Subproject B", { sap_subproject_id: "B" }),
+      makeProject(4, "Subproject A", { sap_subproject_id: "A" }),
+      makeProject(5, "Subproject A", { sap_subproject_id: "A" }),
+      makeProject(6, "Subproject C", { sap_subproject_id: "C" }),
+      makeProject(7, "Subproject A", { sap_subproject_id: "A" }),
+    ]);
+
+    expect(groups.map((group) => group.key)).toEqual([
+      "sap:A",
+      "sap:B",
+      "sap:A#2",
+      "sap:C",
+      "sap:A#3",
+    ]);
+    expect(groups.map((group) => group.projects.map((project) => project.id))).toEqual([
+      [1, 2],
+      [3],
+      [4, 5],
+      [6],
+      [7],
+    ]);
+    expect(new Set(groups.map((group) => group.key)).size).toBe(groups.length);
   });
 
   it("falls back to exact-name grouping when a subproject id is missing", () => {

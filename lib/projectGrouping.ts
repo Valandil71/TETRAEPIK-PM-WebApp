@@ -105,27 +105,38 @@ function getProjectGroupKey<T extends ProjectDisplayGroupShape>(project: T): str
   return `name:${project.name}`;
 }
 
+/**
+ * Keeps the incoming order (e.g. by deadline) and only groups adjacent projects
+ * that share a group key. A subproject whose rows are split by other projects
+ * (e.g. its IN and FN rows) shows up as several groups; later runs get a `#n`
+ * suffix so every group key stays unique.
+ */
 export function groupProjectsForDisplay<T extends ProjectDisplayGroupShape>(
   projects: T[]
 ): ProjectGroup<T>[] {
-  const groups = new Map<string, ProjectGroup<T>>();
+  const groups: ProjectGroup<T>[] = [];
+  const runsPerKey = new Map<string, number>();
+  let currentBaseKey: string | null = null;
 
   projects.forEach((project) => {
-    const key = getProjectGroupKey(project);
-    const existing = groups.get(key);
-    if (existing) {
-      existing.projects.push(project);
+    const baseKey = getProjectGroupKey(project);
+    if (baseKey === currentBaseKey) {
+      groups[groups.length - 1].projects.push(project);
       return;
     }
 
-    groups.set(key, {
-      key,
+    const run = (runsPerKey.get(baseKey) ?? 0) + 1;
+    runsPerKey.set(baseKey, run);
+    currentBaseKey = baseKey;
+
+    groups.push({
+      key: run === 1 ? baseKey : `${baseKey}#${run}`,
       name: project.name,
       projects: [project],
     });
   });
 
-  return Array.from(groups.values());
+  return groups;
 }
 
 export function getGroupDisplayName(name: string): string {
