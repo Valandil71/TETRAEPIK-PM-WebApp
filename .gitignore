@@ -11,6 +11,7 @@ dist/
 
 # TypeScript incremental build info
 *.tsbuildinfo
+next-env.d.ts
 
 # Tool caches
 .turbo/
