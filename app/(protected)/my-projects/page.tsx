@@ -1,12 +1,17 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
+import { Check, CheckCircle } from "lucide-react";
 import { ViewToggle } from "@/components/general/ViewToggle";
 import { MyProjectsTable } from "@/components/my-projects/MyProjectsTable";
 import { MyProjectsCard } from "@/components/my-projects/MyProjectsCard";
 import { RefusalDialog } from "@/components/my-projects/RefusalDialog";
 import { DoneDialog } from "@/components/my-projects/DoneDialog";
 import { InitialMessageDialog } from "@/components/my-projects/InitialMessageDialog";
+import { BulkClaimDialog } from "@/components/my-projects/BulkClaimDialog";
+import { BulkSelectionBar } from "@/components/shared/BulkSelectionBar";
+import { useProjectSelection } from "@/hooks/project/useProjectSelection";
+import { formatProjectName } from "@/utils/formatters";
 import { useUser } from "@/hooks/user/useUser";
 import { useMyProjects } from "@/hooks/project/useMyProjects";
 import type { ProjectAssignment } from "@/types/project-assignment";
@@ -18,8 +23,10 @@ export default function MyProjectsPage() {
     claimedProjects,
     loading: projectsLoading,
     claimProject,
+    claimProjects,
     rejectProject,
     markAsDone,
+    markProjectsAsDone,
   } = useMyProjects(user?.id || null);
 
   const [activeTab, setActiveTab] = useState<"unclaimed" | "inProgress">(
@@ -36,6 +43,58 @@ export default function MyProjectsPage() {
     projectId: number | null;
     projectName: string;
   }>({ open: false, projectId: null, projectName: "" });
+  const [bulkDoneOpen, setBulkDoneOpen] = useState(false);
+  const [bulkClaimOpen, setBulkClaimOpen] = useState(false);
+
+  // Multi-select mode (claim / mark done several projects at once)
+  const selection = useProjectSelection();
+  const currentProjects =
+    activeTab === "unclaimed" ? unclaimedProjects : claimedProjects;
+  const selectedAssignments = useMemo(
+    () => currentProjects.filter((a) => selection.selectedIds.has(a.projects.id)),
+    [currentProjects, selection.selectedIds]
+  );
+
+  // Selected projects that leave the list (claimed elsewhere, removed by a PM) drop out
+  const { isActive: isSelecting, retain: retainSelection } = selection;
+  useEffect(() => {
+    if (isSelecting) retainSelection(currentProjects.map((a) => a.projects.id));
+  }, [isSelecting, retainSelection, currentProjects]);
+
+  const changeTab = (tab: "unclaimed" | "inProgress") => {
+    selection.exit();
+    setActiveTab(tab);
+  };
+
+  const selectedIds = () => selectedAssignments.map((a) => a.projects.id);
+  const bulkInstructions = selectedAssignments
+    .filter((a) => a.initial_message)
+    .map((a) => ({
+      projectId: a.projects.id,
+      projectName: formatProjectName(a.projects.name),
+      message: a.initial_message as string,
+    }));
+
+  const handleBulkClaim = () => {
+    if (bulkInstructions.length > 0) {
+      setBulkClaimOpen(true);
+      return;
+    }
+    claimProjects(selectedIds());
+    selection.exit();
+  };
+
+  const handleConfirmBulkClaim = () => {
+    claimProjects(selectedIds());
+    setBulkClaimOpen(false);
+    selection.exit();
+  };
+
+  const handleConfirmBulkDone = (message: string | null) => {
+    markProjectsAsDone(selectedIds(), message);
+    setBulkDoneOpen(false);
+    selection.exit();
+  };
   const [initialMessageDialog, setInitialMessageDialog] = useState<{
     open: boolean;
     projectId: number | null;
@@ -161,9 +220,6 @@ export default function MyProjectsPage() {
     );
   }
 
-  const currentProjects =
-    activeTab === "unclaimed" ? unclaimedProjects : claimedProjects;
-
   return (
     <div className="p-8 max-w-screen-2xl mx-auto">
       {/* Header */}
@@ -179,7 +235,7 @@ export default function MyProjectsPage() {
         <div className="flex items-end justify-between">
           <div className="flex gap-8">
             <button
-              onClick={() => setActiveTab("unclaimed")}
+              onClick={() => changeTab("unclaimed")}
               className={`pb-3 cursor-pointer border-b-2 text-sm md:text-base transition-colors ${
                 activeTab === "unclaimed" ?
                   "border-blue-500 text-blue-500"
@@ -190,7 +246,7 @@ export default function MyProjectsPage() {
               Available to Claim ({unclaimedProjects.length})
             </button>
             <button
-              onClick={() => setActiveTab("inProgress")}
+              onClick={() => changeTab("inProgress")}
               className={`pb-3 cursor-pointer border-b-2 text-sm md:text-base transition-colors ${
                 activeTab === "inProgress" ?
                   "border-blue-500 text-blue-500"
@@ -227,6 +283,8 @@ export default function MyProjectsPage() {
           onClaim={handleClaimClick}
           onReject={handleRefuseClick}
           onDone={handleDoneClick}
+          onSelectMultiple={selection.start}
+          selection={selection}
         />
       : <MyProjectsCard
           projects={currentProjects}
@@ -234,6 +292,8 @@ export default function MyProjectsPage() {
           onClaim={handleClaimClick}
           onReject={handleRefuseClick}
           onDone={handleDoneClick}
+          onSelectMultiple={selection.start}
+          selection={selection}
         />
       }
 
@@ -250,6 +310,42 @@ export default function MyProjectsPage() {
         onConfirm={handleConfirmDone}
         onCancel={handleCancelDone}
       />
+      <DoneDialog
+        open={bulkDoneOpen}
+        projectName=""
+        projectNames={selectedAssignments.map((a) => formatProjectName(a.projects.name))}
+        onConfirm={handleConfirmBulkDone}
+        onCancel={() => setBulkDoneOpen(false)}
+      />
+      <BulkClaimDialog
+        open={bulkClaimOpen}
+        projectCount={selectedAssignments.length}
+        instructions={bulkInstructions}
+        onClaim={handleConfirmBulkClaim}
+        onCancel={() => setBulkClaimOpen(false)}
+      />
+      {selection.isActive && !bulkDoneOpen && !bulkClaimOpen && (
+        <BulkSelectionBar
+          count={selection.count}
+          hint="Click or drag over projects to select · Esc to cancel"
+          onCancel={selection.exit}
+          actions={[
+            activeTab === "unclaimed" ?
+              {
+                label: "Claim",
+                icon: Check,
+                className: "bg-blue-500 hover:bg-blue-600",
+                onClick: handleBulkClaim,
+              }
+            : {
+                label: "Mark as done",
+                icon: CheckCircle,
+                className: "bg-green-500 hover:bg-green-600",
+                onClick: () => setBulkDoneOpen(true),
+              },
+          ]}
+        />
+      )}
       <InitialMessageDialog
         open={initialMessageDialog.open}
         projectName={initialMessageDialog.projectName}

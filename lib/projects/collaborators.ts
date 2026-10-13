@@ -33,6 +33,31 @@ export function buildAssignmentRows(
 }
 
 /**
+ * Every project × user pair for a bulk assignment, skipping users already on a project
+ * (any assignment status: the table allows one row per pair). Each user's message is used
+ * for all of their projects.
+ */
+export function buildBulkAssignments(
+  projects: { id: number; translatorIds: string[] }[],
+  userIds: string[],
+  messages: Record<string, string>
+): { assignments: CollaboratorAssignment[]; skipped: number } {
+  const assignments: CollaboratorAssignment[] = [];
+  let skipped = 0;
+  for (const project of projects) {
+    const existing = new Set(project.translatorIds);
+    for (const userId of userIds) {
+      if (existing.has(userId)) {
+        skipped++;
+        continue;
+      }
+      assignments.push({ projectId: project.id, userId, message: messages[userId] });
+    }
+  }
+  return { assignments, skipped };
+}
+
+/**
  * Assign collaborators to one or more projects in a single insert, then trigger one push
  * request for the whole batch (each assignee gets a single notification).
  */

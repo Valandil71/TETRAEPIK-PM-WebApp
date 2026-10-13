@@ -9,7 +9,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, CheckCircle2 } from "lucide-react";
 
 interface ConfirmationDialogProps {
   open: boolean;
@@ -22,6 +22,11 @@ interface ConfirmationDialogProps {
   onCancel: () => void;
   isLoading?: boolean;
   variant?: "default" | "destructive" | "success";
+  /**
+   * When set, the outline button (labelled `cancelText`) runs this instead of `onCancel`.
+   * Closing the dialog (X, Esc, outside click) still only calls `onCancel`.
+   */
+  onSecondaryAction?: () => void;
 }
 
 export function ConfirmationDialog({
@@ -35,6 +40,7 @@ export function ConfirmationDialog({
   onCancel,
   isLoading = false,
   variant = "default",
+  onSecondaryAction,
 }: ConfirmationDialogProps) {
   const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) {
@@ -55,7 +61,8 @@ export function ConfirmationDialog({
 
   const handleCancel = () => {
     if (isLoading) return;
-    onCancel();
+    if (onSecondaryAction) onSecondaryAction();
+    else onCancel();
     onOpenChange(false);
   };
 
@@ -74,7 +81,9 @@ export function ConfirmationDialog({
       >
         <DialogHeader>
           <div className="flex items-center gap-3">
-            <AlertTriangle className="w-6 h-6 text-orange-500" />
+            {variant === "success" ?
+              <CheckCircle2 className="w-6 h-6 text-green-500" />
+            : <AlertTriangle className="w-6 h-6 text-orange-500" />}
             <DialogTitle>{title}</DialogTitle>
           </div>
           {isStringDescription ? (

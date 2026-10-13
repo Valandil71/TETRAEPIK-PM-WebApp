@@ -18,6 +18,7 @@ export function PushNotificationGate() {
   return (
     <div
       role="alert"
+      data-push-banner
       className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] max-w-xl rounded-2xl border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950 shadow-lg px-5 py-4 flex items-center gap-4"
     >
       {status === "default" ? (

@@ -68,15 +68,16 @@ export function useMyProjects(userId: string | null) {
 
   const updateAssignmentMutation = useMutation({
     mutationFn: async ({
-      projectId,
+      projectIds,
       userId,
       status,
       projectName,
       message,
     }: {
-      projectId: number;
+      projectIds: number[];
       userId: string;
       status: "claimed" | "rejected" | "done";
+      /** Used in the toast when a single project is updated. */
       projectName: string;
       message?: string | null;
     }) => {
@@ -96,45 +97,55 @@ export function useMyProjects(userId: string | null) {
       const { error } = await supabase
         .from("projects_assignment")
         .update(updateData)
-        .eq("project_id", projectId)
+        .in("project_id", projectIds)
         .eq("user_id", userId);
 
       if (error) throw error;
 
-      return { projectId, status, projectName };
+      return { projectIds, status, projectName };
     },
-    onSuccess: ({ status, projectName, projectId }) => {
+    onSuccess: ({ status, projectName, projectIds }) => {
+      const subject =
+        projectIds.length === 1 ? `Project "${projectName}"` : `${projectIds.length} projects`;
       const messages = {
-        claimed: `Project "${projectName}" claimed successfully`,
-        rejected: `Project "${projectName}" has been rejected`,
-        done: `Project "${projectName}" marked as done`,
+        claimed: `${subject} claimed successfully`,
+        rejected: `${subject} has been rejected`,
+        done: `${subject} marked as done`,
       };
 
       toast.success(messages[status]);
-      if (status === "done") notifyAssignmentsDone([projectId]);
+      if (status === "done") notifyAssignmentsDone(projectIds);
 
       // Invalidate and refetch the projects queries
       queryClient.invalidateQueries({ queryKey: queryKeys.myProjects(userId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.project(projectId) });
+      projectIds.forEach((projectId) =>
+        queryClient.invalidateQueries({ queryKey: queryKeys.project(projectId) })
+      );
       queryClient.invalidateQueries({ queryKey: ["projects-with-translators"] });
       queryClient.invalidateQueries({ queryKey: queryKeys.homeMyProjectsCount(userId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.homeManageProjectsCount() });
     },
-    onError: (_error: Error, { status }) => {
+    onError: (_error: Error, { status, projectIds }) => {
       const action = status === "claimed"
         ? "claim"
         : status === "rejected"
         ? "reject"
         : "mark as done";
-      
-      toast.error(`Failed to ${action} project. Please try again.`);
+      const target = projectIds.length === 1 ? "project" : "projects";
+
+      toast.error(`Failed to ${action} ${target}. Please try again.`);
     },
   });
 
   const claimProject = (projectId: number, projectName: string) => {
-    if (!userId) return;
+    claimProjects([projectId], projectName);
+  };
+
+  /** Claims several assignments in one update. */
+  const claimProjects = (projectIds: number[], projectName = "") => {
+    if (!userId || projectIds.length === 0) return;
     updateAssignmentMutation.mutate({
-      projectId,
+      projectIds,
       userId,
       status: "claimed",
       projectName,
@@ -148,7 +159,7 @@ export function useMyProjects(userId: string | null) {
   ) => {
     if (!userId) return;
     updateAssignmentMutation.mutate({
-      projectId,
+      projectIds: [projectId],
       userId,
       status: "rejected",
       projectName,
@@ -161,9 +172,18 @@ export function useMyProjects(userId: string | null) {
     projectName: string,
     doneMessage?: string | null
   ) => {
-    if (!userId) return;
+    markProjectsAsDone([projectId], doneMessage, projectName);
+  };
+
+  /** Marks several assignments done in one update; the note (if any) goes on all of them. */
+  const markProjectsAsDone = (
+    projectIds: number[],
+    doneMessage?: string | null,
+    projectName = ""
+  ) => {
+    if (!userId || projectIds.length === 0) return;
     updateAssignmentMutation.mutate({
-      projectId,
+      projectIds,
       userId,
       status: "done",
       projectName,
@@ -180,8 +200,10 @@ export function useMyProjects(userId: string | null) {
     claimedProjects,
     loading,
     claimProject,
+    claimProjects,
     rejectProject,
     markAsDone,
+    markProjectsAsDone,
     refreshProjects,
     isUpdating: updateAssignmentMutation.isPending,
   };

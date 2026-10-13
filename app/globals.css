@@ -100,3 +100,8 @@ input.no-spinner[type="number"] {
   appearance: textfield;
   -moz-appearance: textfield;
 }
+
+/* The bulk-selection bar and the push-notification banner both sit bottom-centre: lift the bar. */
+body:has([data-push-banner]) [data-bulk-selection-bar] {
+  bottom: 8rem;
+}

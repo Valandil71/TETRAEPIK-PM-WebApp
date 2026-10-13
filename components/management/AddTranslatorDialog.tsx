@@ -43,6 +43,12 @@ interface AddTranslatorDialogProps {
     messages: Record<string, string>
   ) => void;
   isAdding: boolean;
+  /**
+   * Bulk mode: assign the chosen collaborators to all these projects at once. Everyone is
+   * listed; pairs that already exist are skipped by the caller. Replaces projectId/projectName.
+   */
+  bulkProjects?: { id: number; translatorIds: string[] }[];
+  onAddTranslatorsBulk?: (userIds: string[], messages: Record<string, string>) => void;
 }
 
 export function AddTranslatorDialog({
@@ -54,7 +60,19 @@ export function AddTranslatorDialog({
   liveAssignedTranslatorIds,
   onAddTranslators,
   isAdding,
+  bulkProjects,
+  onAddTranslatorsBulk,
 }: AddTranslatorDialogProps) {
+  const isBulk = !!bulkProjects;
+  const bulkCount = bulkProjects?.length ?? 0;
+  /** How many of the selected projects each user is already on (bulk mode only). */
+  const bulkAssignedCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    bulkProjects?.forEach((project) =>
+      project.translatorIds.forEach((id) => counts.set(id, (counts.get(id) ?? 0) + 1))
+    );
+    return counts;
+  }, [bulkProjects]);
   const { data: users, isLoading: usersLoading } = useUsers();
   const { workloads, isLoading: workloadsLoading } = useUserWorkload();
   const [selectedTranslators, setSelectedTranslators] = useState<Set<string>>(
@@ -66,7 +84,7 @@ export function AddTranslatorDialog({
 
   // Detect if the assignment data has changed since the dialog was opened
   const isDataStale = useMemo(() => {
-    if (!liveAssignedTranslatorIds) return false;
+    if (isBulk || !liveAssignedTranslatorIds) return false;
 
     // Check if the sets are different
     const originalSet = new Set(assignedTranslatorIds);
@@ -79,7 +97,7 @@ export function AddTranslatorDialog({
     }
 
     return false;
-  }, [assignedTranslatorIds, liveAssignedTranslatorIds]);
+  }, [isBulk, assignedTranslatorIds, liveAssignedTranslatorIds]);
 
   // Filter out already assigned translators and test accounts (shown on localhost only), then sort by
   // role (Collaborators, PMs, Admins) and, within each role, lowest workload first
@@ -93,7 +111,7 @@ export function AddTranslatorDialog({
     return (users || [])
       .filter(
         (user) =>
-          !assignedTranslatorIds.includes(user.id) &&
+          (isBulk || !assignedTranslatorIds.includes(user.id)) &&
           !isHiddenTestAccount(user.name)
       )
       .sort(
@@ -102,9 +120,13 @@ export function AddTranslatorDialog({
           hours(a.id) - hours(b.id) ||
           a.name.localeCompare(b.name)
       );
-  }, [users, assignedTranslatorIds, workloads]);
+  }, [users, assignedTranslatorIds, workloads, isBulk]);
+
+  const isOnAllBulkProjects = (userId: string) =>
+    isBulk && (bulkAssignedCounts.get(userId) ?? 0) >= bulkCount;
 
   const handleTranslatorToggle = (userId: string) => {
+    if (isOnAllBulkProjects(userId)) return;
     const newSelection = new Set(selectedTranslators);
     if (newSelection.has(userId)) {
       newSelection.delete(userId);
@@ -122,11 +144,15 @@ export function AddTranslatorDialog({
   };
 
   const handleAssignTranslators = () => {
-    onAddTranslators(
-      projectId,
-      Array.from(selectedTranslators),
-      translatorMessages
-    );
+    if (isBulk) {
+      onAddTranslatorsBulk?.(Array.from(selectedTranslators), translatorMessages);
+    } else {
+      onAddTranslators(
+        projectId,
+        Array.from(selectedTranslators),
+        translatorMessages
+      );
+    }
     setSelectedTranslators(new Set());
     setTranslatorMessages({});
     onOpenChange(false);
@@ -157,10 +183,25 @@ export function AddTranslatorDialog({
           </div>
         : <>
           <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0">
-            <DialogTitle>Add Collaborator</DialogTitle>
+            <DialogTitle>
+              {isBulk ?
+                `Add Collaborators to ${bulkCount} Project${bulkCount !== 1 ? "s" : ""}`
+              : "Add Collaborator"}
+            </DialogTitle>
             <DialogDescription>
-              Select collaborators to add to{" "}
-              <span className="font-medium">{projectName}</span>
+              {isBulk ?
+                <>
+                  Each selected collaborator is added to{" "}
+                  <span className="font-medium">
+                    {bulkCount === 1 ? "the selected project" : `all ${bulkCount} selected projects`}
+                  </span>
+                  . Projects they are already on are skipped.
+                </>
+              : <>
+                  Select collaborators to add to{" "}
+                  <span className="font-medium">{projectName}</span>
+                </>
+              }
             </DialogDescription>
           </DialogHeader>
 
@@ -180,15 +221,18 @@ export function AddTranslatorDialog({
             {availableUsers.map((user: User) => {
               const isSelected = selectedTranslators.has(user.id);
               const userWorkload = workloads.get(user.id);
+              const bulkAssigned = bulkAssignedCounts.get(user.id) ?? 0;
+              const isOnAll = isOnAllBulkProjects(user.id);
               const fullName =
                 user.short_name ? `${user.name} (${user.short_name})` : user.name;
               return (
                 <div
                   key={user.id}
-                  className={`min-w-0 p-3 bg-white dark:bg-gray-800 rounded-lg border transition-all duration-200 cursor-pointer ${
-                    isSelected ?
+                  className={`min-w-0 p-3 bg-white dark:bg-gray-800 rounded-lg border transition-all duration-200 ${
+                    isOnAll ? "opacity-50 cursor-not-allowed border-gray-200 dark:border-gray-700"
+                    : isSelected ?
                       "border-blue-500 shadow-lg"
-                    : "border-gray-200 dark:border-gray-700 hover:shadow-md"
+                    : "border-gray-200 dark:border-gray-700 hover:shadow-md cursor-pointer"
                   }`}
                   onClick={(e) => {
                     // Don't toggle if clicking on textarea or label
@@ -213,6 +257,7 @@ export function AddTranslatorDialog({
                     <input
                       type="checkbox"
                       checked={isSelected}
+                      disabled={isOnAll}
                       onChange={() => handleTranslatorToggle(user.id)}
                       className="outline-style absolute top-0 left-0 w-5 h-5 rounded cursor-pointer"
                     />
@@ -244,6 +289,11 @@ export function AddTranslatorDialog({
                       <p className="truncate text-gray-500 dark:text-gray-400 text-xs">
                         {formatRoleDisplay(user.role)}
                       </p>
+                      {isBulk && bulkAssigned > 0 && (
+                        <p className="truncate text-amber-600 dark:text-amber-400 text-xs mt-0.5">
+                          {isOnAll ? "Already on all of them" : `Already on ${bulkAssigned} of ${bulkCount}`}
+                        </p>
+                      )}
                     </div>
                   </div>
 
@@ -325,6 +375,7 @@ export function AddTranslatorDialog({
                       </label>
                       <span className="block text-gray-400 dark:text-gray-500 text-xs mb-1">
                         Only visible to translator after claiming
+                        {isBulk && bulkCount > 1 && ` · same for all ${bulkCount} projects`}
                       </span>
                       <Textarea
                         value={translatorMessages[user.id] || ""}

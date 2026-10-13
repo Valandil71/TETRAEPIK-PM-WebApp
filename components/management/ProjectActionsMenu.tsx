@@ -9,6 +9,7 @@ import {
   FilePlus,
   Loader2,
   Edit,
+  ListChecks,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -30,6 +31,9 @@ interface ProjectActionsMenuProps {
   isCreatingStmProject?: boolean;
   onEditDetails: () => void;
   onCompleteProject: () => void;
+  onSelectMultiple: () => void;
+  /** "Remove a translator" is only offered when someone is assigned. */
+  hasTranslators: boolean;
 }
 
 export function ProjectActionsMenu({
@@ -43,6 +47,8 @@ export function ProjectActionsMenu({
   isCreatingStmProject = false,
   onEditDetails,
   onCompleteProject,
+  onSelectMultiple,
+  hasTranslators,
 }: ProjectActionsMenuProps) {
   const handleOpenChange = (open: boolean) => {
     // Only call onToggle when closing (to sync parent state)
@@ -102,16 +108,18 @@ export function ProjectActionsMenu({
           <UserCheck className="w-4 h-4 mr-2" />
           Self-Assign
         </DropdownMenuItem>
-        <DropdownMenuItem
-          className="cursor-pointer px-4 py-2.5 text-gray-700 dark:text-gray-300 hover:bg-red-100 dark:hover:bg-gray-700 hover:text-red-700 dark:hover:text-red-400 focus:bg-red-100 dark:focus:bg-gray-700 focus:text-red-700 dark:focus:text-red-400"
-          onClick={(e) => {
-            e.stopPropagation();
-            onRemoveTranslator();
-          }}
-        >
-          <UserMinus className="w-4 h-4 mr-2" />
-          Remove a translator
-        </DropdownMenuItem>
+        {hasTranslators && (
+          <DropdownMenuItem
+            className="cursor-pointer px-4 py-2.5 text-gray-700 dark:text-gray-300 hover:bg-red-100 dark:hover:bg-gray-700 hover:text-red-700 dark:hover:text-red-400 focus:bg-red-100 dark:focus:bg-gray-700 focus:text-red-700 dark:focus:text-red-400"
+            onClick={(e) => {
+              e.stopPropagation();
+              onRemoveTranslator();
+            }}
+          >
+            <UserMinus className="w-4 h-4 mr-2" />
+            Remove a translator
+          </DropdownMenuItem>
+        )}
         <DropdownMenuItem
           className="cursor-pointer px-4 py-2.5 text-gray-700 dark:text-gray-300 hover:bg-blue-100 dark:hover:bg-gray-700 focus:bg-blue-100 dark:focus:bg-gray-700"
           disabled={isCreatingStmProject}
@@ -135,6 +143,17 @@ export function ProjectActionsMenu({
         >
           <Edit className="w-4 h-4 mr-2" />
           Edit Details
+        </DropdownMenuItem>
+        <DropdownMenuSeparator className="bg-gray-200 dark:bg-gray-700" />
+        <DropdownMenuItem
+          className="cursor-pointer px-4 py-2.5 text-gray-700 dark:text-gray-300 hover:bg-blue-100 dark:hover:bg-gray-700 focus:bg-blue-100 dark:focus:bg-gray-700"
+          onClick={(e) => {
+            e.stopPropagation();
+            onSelectMultiple();
+          }}
+        >
+          <ListChecks className="w-4 h-4 mr-2" />
+          Select multiple
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

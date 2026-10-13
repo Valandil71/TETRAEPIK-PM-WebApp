@@ -31,7 +31,9 @@ import { getInstructionsPreview } from "@/utils/instructionsPreview";
 import { useInstructionExclusions } from "@/hooks/settings/useInstructionExclusions";
 import { useManagementPageStore } from "@/lib/stores/useManagementPageStore";
 import type { ProjectGroup } from "@/lib/projectGrouping";
-import { getGroupDisplayName } from "@/lib/projectGrouping";
+import { getGroupDisplayName, getGroupSelectionState } from "@/lib/projectGrouping";
+import { Checkbox } from "@/components/ui/checkbox";
+import type { ProjectSelection } from "@/hooks/project/useProjectSelection";
 
 interface ProjectWithTranslators {
   id: number;
@@ -119,6 +121,9 @@ interface ManagementCardProps {
   isCreatingStmProject: boolean;
   onEditDetails: (projectId: number) => void;
   onCompleteProject: (projectId: number) => void;
+  onSelectMultiple: (projectId: number) => void;
+  /** Multi-select mode: cards toggle (click or drag) instead of opening the project. */
+  selection?: ProjectSelection;
   editingProjectId: number | null;
   editFocusField: "words" | "lines";
   editWords: string;
@@ -146,6 +151,8 @@ export function ManagementCard({
   isCreatingStmProject,
   onEditDetails,
   onCompleteProject,
+  onSelectMultiple,
+  selection,
   editingProjectId,
   editFocusField,
   editWords,
@@ -170,8 +177,10 @@ export function ManagementCard({
   const getLanguageColorStyleLocal = (langIn: string, langOut: string) =>
     getLanguageColorStyle(langIn, langOut, getLanguageColorPreview);
 
+  const isSelecting = !!selection?.isActive;
+
   const handleCardClick = (id: number, e: React.MouseEvent) => {
-    if ((e.target as HTMLElement).closest("button")) {
+    if (isSelecting || (e.target as HTMLElement).closest("button")) {
       return;
     }
     rememberReturnProject(id);
@@ -210,16 +219,30 @@ export function ManagementCard({
     }
   };
 
-  const renderProjectCard = (project: ProjectWithTranslators) => (
+  const renderProjectCard = (project: ProjectWithTranslators) => {
+    const isSelected = isSelecting && selection.isSelected(project.id);
+    return (
     <div
       key={project.id}
-      className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-4 cursor-pointer hover:shadow-lg dark:hover:shadow-blue-500/20 dark:hover:border-blue-500/50 transition-all"
+      className={`rounded-2xl border p-4 cursor-pointer hover:shadow-lg dark:hover:shadow-blue-500/20 transition-all ${
+        isSelected ?
+          "bg-blue-50 dark:bg-blue-900/30 border-blue-500 dark:border-blue-500"
+        : "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 dark:hover:border-blue-500/50"
+      } ${isSelecting ? "select-none" : ""}`}
       data-management-project-id={project.id}
       onClick={(e) => handleCardClick(project.id, e)}
+      {...(isSelecting ? selection.getItemProps(project.id) : {})}
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center">
-          <ProjectColorLegendTooltip
+          {isSelecting ?
+            <Checkbox
+              checked={isSelected}
+              tabIndex={-1}
+              className="pointer-events-none mr-3"
+              aria-label={`Select ${project.name}`}
+            />
+          : <ProjectColorLegendTooltip
             status={project.status}
             system={project.system}
             langIn={project.language_in}
@@ -240,6 +263,7 @@ export function ManagementCard({
               />
             </div>
           </ProjectColorLegendTooltip>
+          }
           <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-xs md:text-sm">
             {project.system}
           </span>
@@ -261,6 +285,8 @@ export function ManagementCard({
           }
           onEditDetails={() => onEditDetails(project.id)}
           onCompleteProject={() => onCompleteProject(project.id)}
+          onSelectMultiple={() => onSelectMultiple(project.id)}
+          hasTranslators={project.translators.length > 0}
         />
       </div>
 
@@ -385,7 +411,7 @@ export function ManagementCard({
           sapInstructions: project.sap_instructions,
           exclusionSet,
         });
-        const canOpenInstructions = !!onInstructionsClick && hasAnyInstructions;
+        const canOpenInstructions = !isSelecting && !!onInstructionsClick && hasAnyInstructions;
 
         return (
           <p
@@ -401,7 +427,8 @@ export function ManagementCard({
         );
       })()}
     </div>
-  );
+    );
+  };
 
   if (groups.length === 0) {
     return (
@@ -422,11 +449,22 @@ export function ManagementCard({
         }
 
         const isExpanded = expandedGroups.has(group.key);
+        const groupIds = group.projects.map((project) => project.id);
+        const groupState =
+          isSelecting ? getGroupSelectionState(groupIds, selection.selectedIds) : "unchecked";
         return (
           <div
             key={group.key}
             className="md:col-span-2 lg:col-span-3 p-4 bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 transition-all"
           >
+            <div className="flex items-center gap-3">
+            {isSelecting && (
+              <Checkbox
+                checked={groupState === "indeterminate" ? "indeterminate" : groupState === "checked"}
+                onCheckedChange={() => selection.setMany(groupIds, groupState !== "checked")}
+                aria-label={`Select all projects in ${group.name}`}
+              />
+            )}
             <button
               type="button"
               onClick={() => onToggleGroup(group.key)}
@@ -444,6 +482,7 @@ export function ManagementCard({
                 {group.projects.length} projects
               </span>
             </button>
+            </div>
 
             {isExpanded && (
               <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

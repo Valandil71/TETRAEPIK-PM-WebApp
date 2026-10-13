@@ -9,6 +9,9 @@ import { ProjectTableBase } from "@/components/shared/ProjectTableBase";
 import { DeadlineDisplay } from "@/components/general/DeadlineDisplay";
 import { ProjectColorLegendTooltip } from "@/components/shared/ProjectColorLegendTooltip";
 import type { ProjectAssignment } from "@/types/project-assignment";
+import type { ProjectSelection } from "@/hooks/project/useProjectSelection";
+import { Checkbox } from "@/components/ui/checkbox";
+import { MyProjectsActionsMenu } from "./MyProjectsActionsMenu";
 
 interface MyProjectsTableProps {
   projects: ProjectAssignment[];
@@ -16,6 +19,9 @@ interface MyProjectsTableProps {
   onClaim: (assignment: ProjectAssignment) => void;
   onReject: (projectId: number, projectName: string) => void;
   onDone: (projectId: number, projectName: string) => void;
+  onSelectMultiple: (projectId: number) => void;
+  /** Multi-select mode: items toggle (click or drag) instead of opening the project. */
+  selection?: ProjectSelection;
 }
 
 export function MyProjectsTable({
@@ -24,6 +30,8 @@ export function MyProjectsTable({
   onClaim,
   onReject,
   onDone,
+  onSelectMultiple,
+  selection,
 }: MyProjectsTableProps) {
   const router = useRouter();
   const { getSystemColorPreview, getLanguageColorPreview } = useColorSettings();
@@ -34,9 +42,12 @@ export function MyProjectsTable({
   const getLanguageColorStyleLocal = (langIn: string, langOut: string) =>
     getLanguageColorStyle(langIn, langOut, getLanguageColorPreview);
 
+  const isSelecting = !!selection?.isActive;
+  const showBulkMenu = !isSelecting && projects.length > 1;
+
   const handleRowClick = (assignment: ProjectAssignment, e: React.MouseEvent) => {
     // Don't navigate if clicking on a button
-    if ((e.target as HTMLElement).closest("button")) {
+    if (isSelecting || (e.target as HTMLElement).closest("button")) {
       return;
     }
     router.push(`/project/${assignment.projects.id}`);
@@ -66,6 +77,16 @@ export function MyProjectsTable({
       className: "w-4",
       render: (assignment: ProjectAssignment) => {
         const project = assignment.projects;
+        if (isSelecting) {
+          return (
+            <Checkbox
+              checked={selection.isSelected(project.id)}
+              tabIndex={-1}
+              className="pointer-events-none"
+              aria-label={`Select ${project.name}`}
+            />
+          );
+        }
         return (
           <ProjectColorLegendTooltip
             status={project.status}
@@ -168,7 +189,8 @@ export function MyProjectsTable({
       header: "Action",
       render: (assignment: ProjectAssignment) => {
         const project = assignment.projects;
-        return activeTab === "unclaimed" ?
+        if (isSelecting) return null;
+        const actions = activeTab === "unclaimed" ?
           <div className="flex gap-2 group-hover:scale-110 group-hover:opacity-100 opacity-90 transition-all duration-200">
             <button
               onClick={(e) => {
@@ -204,6 +226,17 @@ export function MyProjectsTable({
             <Check className="w-4 h-4" />
             Done
           </button>;
+        return (
+          <div className="flex items-center gap-1">
+            {actions}
+            {showBulkMenu && (
+              <MyProjectsActionsMenu
+                activeTab={activeTab}
+                onSelectMultiple={() => onSelectMultiple(project.id)}
+              />
+            )}
+          </div>
+        );
       },
     },
   ];
@@ -215,7 +248,16 @@ export function MyProjectsTable({
       emptyStateTitle="No projects found"
       onRowClick={handleRowClick}
       enablePagination={false}
-      rowClassName="group"
+      rowClassName={(assignment) =>
+        `group ${isSelecting ? "select-none" : ""} ${
+          isSelecting && selection.isSelected(assignment.projects.id) ?
+            "bg-blue-100 dark:bg-blue-900/40 hover:bg-blue-100 dark:hover:bg-blue-900/40"
+          : ""
+        }`
+      }
+      getRowProps={(assignment) =>
+        isSelecting ? selection.getItemProps(assignment.projects.id) : {}
+      }
       getRowKey={(assignment) => `${assignment.project_id}-${assignment.user_id}`}
       stickyHeader
     />

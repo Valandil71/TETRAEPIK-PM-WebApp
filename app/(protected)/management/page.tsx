@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { X, Loader2, AlertCircle, Download, FileDown } from "lucide-react";
+import { X, Loader2, AlertCircle, Download, FileDown, UserPlus, CheckCircle } from "lucide-react";
 import { useUser } from "@/hooks/user/useUser";
 import { useProjectsWithTranslators } from "@/hooks/project/useProjectsWithTranslators";
 import {
@@ -40,9 +40,13 @@ import { useLayoutStore } from "@/lib/stores/useLayoutStore";
 import { groupProjectsForDisplay } from "@/lib/projectGrouping";
 import {
   addCollaborators,
+  buildBulkAssignments,
   invalidateCollaboratorQueries,
   removeCollaborator,
 } from "@/lib/projects/collaborators";
+import { useProjectSelection } from "@/hooks/project/useProjectSelection";
+import { BulkSelectionBar } from "@/components/shared/BulkSelectionBar";
+import { formatProjectName } from "@/utils/formatters";
 import { createStmProject } from "@/lib/projects/stm";
 import { useProjectGroupExpansion } from "@/hooks/project/useProjectGroupExpansion";
 import { useProjectListPagination } from "@/hooks/project/useProjectListPagination";
@@ -150,9 +154,12 @@ function ProjectManagementContent() {
 
   const [completeConfirmModal, setCompleteConfirmModal] = useState<{
     open: boolean;
-    projectId: number;
-    projectName: string;
-  }>({ open: false, projectId: 0, projectName: "" });
+    projectIds: number[];
+  }>({ open: false, projectIds: [] });
+
+  // Multi-select mode (bulk assign / complete)
+  const selection = useProjectSelection();
+  const [bulkAddTranslatorOpen, setBulkAddTranslatorOpen] = useState(false);
 
   // SAP Import dialog state
   const [sapImportDialogOpen, setSapImportDialogOpen] = useState(false);
@@ -326,6 +333,18 @@ function ProjectManagementContent() {
     [filteredProjects]
   );
 
+  // Keep the selection to what is visible, so a tab/filter change cannot leave hidden projects
+  // selected (pagination keeps it: other pages are still in filteredProjects).
+  const { isActive: isSelecting, retain: retainSelection } = selection;
+  useEffect(() => {
+    if (isSelecting) retainSelection(filteredProjects.map((p) => p.id));
+  }, [isSelecting, retainSelection, filteredProjects]);
+
+  const selectedProjects = useMemo(
+    () => allProjects.filter((p) => selection.selectedIds.has(p.id)),
+    [allProjects, selection.selectedIds]
+  );
+
   const {
     currentPage,
     totalPages,
@@ -396,24 +415,31 @@ function ProjectManagementContent() {
 
   // Mutations
   const markCompleteMutation = useMutation({
-    mutationFn: async (projectId: number) => {
+    mutationFn: async (projectIds: number[]) => {
       const { error } = await supabase
         .from("projects")
         .update({ status: "complete" })
-        .eq("id", projectId);
+        .in("id", projectIds);
 
       if (error)
         throw new Error(`Failed to mark project as complete: ${error.message}`);
     },
-    onSuccess: (_, projectId) => {
-      notifyProjectsCompleted([projectId]);
+    onSuccess: (_, projectIds) => {
+      notifyProjectsCompleted(projectIds);
       queryClient.invalidateQueries({
         queryKey: queryKeys.projectsWithTranslators(),
       });
-      queryClient.invalidateQueries({ queryKey: queryKeys.project(projectId) });
+      projectIds.forEach((projectId) =>
+        queryClient.invalidateQueries({ queryKey: queryKeys.project(projectId) })
+      );
       queryClient.invalidateQueries({ queryKey: queryKeys.homeManageProjectsCount() });
-      toast.success("Project marked as complete");
+      toast.success(
+        projectIds.length === 1 ?
+          "Project marked as complete"
+        : `${projectIds.length} projects marked as complete`
+      );
       setOpenMenu(null);
+      selection.exit();
     },
     onError: (error: Error) =>
       toast.error(getUserFriendlyError(error, "project management")),
@@ -444,6 +470,39 @@ function ProjectManagementContent() {
         projectName: "",
         assignedTranslatorIds: [],
       });
+    },
+    onError: (error: Error) =>
+      toast.error(getUserFriendlyError(error, "project management")),
+  });
+
+  const bulkAddTranslatorsMutation = useMutation({
+    mutationFn: async ({
+      projects,
+      userIds,
+      messages,
+    }: {
+      projects: { id: number; translatorIds: string[] }[];
+      userIds: string[];
+      messages: Record<string, string>;
+    }) => {
+      const { assignments, skipped } = buildBulkAssignments(projects, userIds, messages);
+      if (assignments.length > 0) {
+        await addCollaborators(supabase, assignments, user?.id);
+      }
+      return { added: assignments.length, skipped, projectIds: projects.map((p) => p.id) };
+    },
+    onSuccess: ({ added, skipped, projectIds }, { userIds }) => {
+      invalidateCollaboratorQueries(queryClient, projectIds, userIds);
+      const skippedText = skipped > 0 ? ` (${skipped} already assigned, skipped)` : "";
+      if (added === 0) {
+        toast.info(`Nothing to add: everyone was already assigned${skippedText}`);
+      } else {
+        toast.success(
+          `${added} assignment${added !== 1 ? "s" : ""} added to ${projectIds.length} project${projectIds.length !== 1 ? "s" : ""}${skippedText}`
+        );
+      }
+      setBulkAddTranslatorOpen(false);
+      selection.exit();
     },
     onError: (error: Error) =>
       toast.error(getUserFriendlyError(error, "project management")),
@@ -637,16 +696,21 @@ function ProjectManagementContent() {
   };
 
   const handleCompleteProject = (projectId: number) => {
-    const project = allProjects.find((p) => p.id === projectId);
-    if (project) {
-      setCompleteConfirmModal({
-        open: true,
-        projectId,
-        projectName: project.name,
-      });
+    if (allProjects.some((p) => p.id === projectId)) {
+      setCompleteConfirmModal({ open: true, projectIds: [projectId] });
       setOpenMenu(null);
     }
   };
+
+  const handleSelectMultiple = (projectId: number) => {
+    setOpenMenu(null);
+    handleCancelWordsLinesEdit();
+    selection.start(projectId);
+  };
+
+  const completeModalProjects = allProjects.filter((p) =>
+    completeConfirmModal.projectIds.includes(p.id)
+  );
 
   const clearAllFilters = () => {
     setStoredCurrentPage(1);
@@ -866,6 +930,8 @@ function ProjectManagementContent() {
           isCreatingStmProject={createStmProjectMutation.isPending}
           onEditDetails={handleEditDetails}
           onCompleteProject={handleCompleteProject}
+          onSelectMultiple={handleSelectMultiple}
+          selection={selection}
           editingProjectId={editingProjectId}
           editFocusField={editFocusField}
           editWords={editWords}
@@ -894,6 +960,8 @@ function ProjectManagementContent() {
           isCreatingStmProject={createStmProjectMutation.isPending}
           onEditDetails={handleEditDetails}
           onCompleteProject={handleCompleteProject}
+          onSelectMultiple={handleSelectMultiple}
+          selection={selection}
           editingProjectId={editingProjectId}
           editFocusField={editFocusField}
           editWords={editWords}
@@ -966,29 +1034,98 @@ function ProjectManagementContent() {
       <ConfirmationDialog
         open={completeConfirmModal.open}
         onOpenChange={(open) =>
-          setCompleteConfirmModal({
-            open,
-            projectId: completeConfirmModal.projectId,
-            projectName: completeConfirmModal.projectName,
-          })
+          setCompleteConfirmModal((prev) => ({ ...prev, open }))
         }
-        title="Mark Project Complete"
+        variant="success"
+        title={
+          completeModalProjects.length > 1 ?
+            `Mark ${completeModalProjects.length} projects as complete`
+          : "Mark project as complete"
+        }
         description={
-          <>
-            Are you sure you want to mark{" "}
-            <span className="font-medium">
-              {completeConfirmModal.projectName}
-            </span>{" "}
-            as complete? This action indicates the project is finished.
-          </>
+          <div className="space-y-3">
+            <p>
+              {completeModalProjects.length > 1 ? "These projects" : "This project"} will move
+              to Concluded Projects and the other PMs and admins will be notified.
+            </p>
+            <ul className="max-h-48 overflow-y-auto space-y-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 px-3 py-2">
+              {completeModalProjects.map((project) => (
+                <li
+                  key={project.id}
+                  className="font-medium text-gray-900 dark:text-white break-words"
+                >
+                  {formatProjectName(project.name)}
+                  <span className="ml-2 text-xs font-normal text-gray-500 dark:text-gray-400">
+                    {project.system} · {project.language_in} → {project.language_out}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
         }
-        confirmText="Mark Complete"
-        onConfirm={() =>
-          markCompleteMutation.mutate(completeConfirmModal.projectId)
-        }
+        cancelText="Select more"
+        confirmText="Mark as complete"
+        // "Select more": from a single project, enter multi-select with it selected;
+        // from the selection bar, just go back to the selection.
+        onSecondaryAction={() => {
+          if (!selection.isActive && completeConfirmModal.projectIds[0] != null) {
+            handleSelectMultiple(completeConfirmModal.projectIds[0]);
+          }
+        }}
+        onConfirm={() => markCompleteMutation.mutate(completeConfirmModal.projectIds)}
         onCancel={() => {}}
         isLoading={markCompleteMutation.isPending}
       />
+
+      {/* Bulk add collaborators */}
+      <AddTranslatorDialog
+        open={bulkAddTranslatorOpen}
+        onOpenChange={setBulkAddTranslatorOpen}
+        projectId={0}
+        projectName=""
+        bulkProjects={selectedProjects.map((p) => ({
+          id: p.id,
+          translatorIds: p.translators.map((t) => t.id),
+        }))}
+        onAddTranslators={() => {}}
+        onAddTranslatorsBulk={(userIds, messages) =>
+          bulkAddTranslatorsMutation.mutate({
+            projects: selectedProjects.map((p) => ({
+              id: p.id,
+              translatorIds: p.translators.map((t) => t.id),
+            })),
+            userIds,
+            messages,
+          })
+        }
+        isAdding={bulkAddTranslatorsMutation.isPending}
+      />
+
+      {selection.isActive && !bulkAddTranslatorOpen && !completeConfirmModal.open && (
+        <BulkSelectionBar
+          count={selection.count}
+          hint="Click or drag over projects to select · Esc to cancel"
+          onCancel={selection.exit}
+          actions={[
+            {
+              label: "Add translator",
+              icon: UserPlus,
+              className: "bg-blue-500 hover:bg-blue-600",
+              onClick: () => setBulkAddTranslatorOpen(true),
+            },
+            {
+              label: "Mark as complete",
+              icon: CheckCircle,
+              className: "bg-green-500 hover:bg-green-600",
+              onClick: () =>
+                setCompleteConfirmModal({
+                  open: true,
+                  projectIds: selectedProjects.map((p) => p.id),
+                }),
+            },
+          ]}
+        />
+      )}
 
       {/* SAP Import Dialog */}
       <SapImportDialog

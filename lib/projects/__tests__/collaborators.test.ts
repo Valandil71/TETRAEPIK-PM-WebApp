@@ -4,6 +4,7 @@ import { QueryClient } from '@tanstack/react-query';
 import {
   addCollaborators,
   buildAssignmentRows,
+  buildBulkAssignments,
   invalidateCollaboratorQueries,
   removeCollaborator,
 } from '@/lib/projects/collaborators';
@@ -141,5 +142,29 @@ describe('invalidateCollaboratorQueries', () => {
 
     keys.forEach((key) => expect(queryClient.getQueryState(key)?.isInvalidated).toBe(true));
     untouched.forEach((key) => expect(queryClient.getQueryState(key)?.isInvalidated).toBe(false));
+  });
+});
+
+describe('buildBulkAssignments', () => {
+  it('pairs every project with every user and skips pairs that already exist', () => {
+    const { assignments, skipped } = buildBulkAssignments(
+      [
+        { id: 1, translatorIds: [] },
+        { id: 2, translatorIds: ['a'] },
+      ],
+      ['a', 'b'],
+      { a: 'note for a' }
+    );
+    expect(assignments).toEqual([
+      { projectId: 1, userId: 'a', message: 'note for a' },
+      { projectId: 1, userId: 'b', message: undefined },
+      { projectId: 2, userId: 'b', message: undefined },
+    ]);
+    expect(skipped).toBe(1);
+  });
+
+  it('returns nothing to insert when everyone is already assigned', () => {
+    const result = buildBulkAssignments([{ id: 1, translatorIds: ['a'] }], ['a'], {});
+    expect(result).toEqual({ assignments: [], skipped: 1 });
   });
 });

@@ -8,6 +8,9 @@ import { getSystemColorStyle, getLanguageColorStyle } from "@/utils/projectTable
 import { DeadlineDisplay } from "@/components/general/DeadlineDisplay";
 import { ProjectColorLegendTooltip } from "@/components/shared/ProjectColorLegendTooltip";
 import type { ProjectAssignment } from "@/types/project-assignment";
+import type { ProjectSelection } from "@/hooks/project/useProjectSelection";
+import { Checkbox } from "@/components/ui/checkbox";
+import { MyProjectsActionsMenu } from "./MyProjectsActionsMenu";
 
 interface MyProjectsCardProps {
   projects: ProjectAssignment[];
@@ -15,6 +18,9 @@ interface MyProjectsCardProps {
   onClaim: (assignment: ProjectAssignment) => void;
   onReject: (projectId: number, projectName: string) => void;
   onDone: (projectId: number, projectName: string) => void;
+  onSelectMultiple: (projectId: number) => void;
+  /** Multi-select mode: items toggle (click or drag) instead of opening the project. */
+  selection?: ProjectSelection;
 }
 
 export function MyProjectsCard({
@@ -23,13 +29,18 @@ export function MyProjectsCard({
   onClaim,
   onReject,
   onDone,
+  onSelectMultiple,
+  selection,
 }: MyProjectsCardProps) {
   const router = useRouter();
   const { getSystemColorPreview, getLanguageColorPreview } = useColorSettings();
 
+  const isSelecting = !!selection?.isActive;
+  const showBulkMenu = !isSelecting && projects.length > 1;
+
   const handleCardClick = (projectId: number, e: React.MouseEvent) => {
     // Don't navigate if clicking on a button
-    if ((e.target as HTMLElement).closest("button")) {
+    if (isSelecting || (e.target as HTMLElement).closest("button")) {
       return;
     }
     router.push(`/project/${projectId}`);
@@ -63,15 +74,28 @@ export function MyProjectsCard({
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       {sortedProjects.map((assignment) => {
         const project = assignment.projects;
+        const isSelected = isSelecting && selection.isSelected(project.id);
 
         return (
           <div
             key={`${assignment.project_id}-${assignment.user_id}`}
-            className="group bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-4 cursor-pointer hover:shadow-lg dark:hover:shadow-blue-500/20 dark:hover:border-blue-500/50 transition-all"
+            className={`group rounded-2xl border p-4 cursor-pointer hover:shadow-lg dark:hover:shadow-blue-500/20 transition-all ${
+              isSelected ?
+                "bg-blue-50 dark:bg-blue-900/30 border-blue-500 dark:border-blue-500"
+              : "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 dark:hover:border-blue-500/50"
+            } ${isSelecting ? "select-none" : ""}`}
             onClick={(e) => handleCardClick(project.id, e)}
+            {...(isSelecting ? selection.getItemProps(project.id) : {})}
           >
             <div className="flex items-center mb-4">
-              <ProjectColorLegendTooltip
+              {isSelecting ?
+                <Checkbox
+                  checked={isSelected}
+                  tabIndex={-1}
+                  className="pointer-events-none mr-3"
+                  aria-label={`Select ${project.name}`}
+                />
+              : <ProjectColorLegendTooltip
                 status={project.status}
                 system={project.system}
                 langIn={project.language_in}
@@ -92,9 +116,18 @@ export function MyProjectsCard({
                   />
                 </div>
               </ProjectColorLegendTooltip>
+              }
               <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-xs md:text-sm">
                 {project.system}
               </span>
+              {showBulkMenu && (
+                <div className="ml-auto">
+                  <MyProjectsActionsMenu
+                    activeTab={activeTab}
+                    onSelectMultiple={() => onSelectMultiple(project.id)}
+                  />
+                </div>
+              )}
             </div>
             <h3 className="text-gray-900 dark:text-white text-lg font-bold mb-2 break-words line-clamp-2">
               {formatProjectName(project.name)}
@@ -129,7 +162,8 @@ export function MyProjectsCard({
                 </div>
               </div>
             )}
-            {activeTab === "unclaimed" ?
+            {isSelecting ? null
+            : activeTab === "unclaimed" ?
               <div className="flex gap-2 group-hover:scale-110 group-hover:opacity-100 opacity-90 transition-all duration-200">
                 <button
                   onClick={(e) => {

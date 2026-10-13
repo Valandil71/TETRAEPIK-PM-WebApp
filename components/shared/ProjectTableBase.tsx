@@ -24,6 +24,8 @@ interface ProjectTableBaseProps<T> {
   getRowKey: (item: T) => string | number;
   leadingColumn?: (item: T) => ReactNode;
   getRowStyle?: (item: T) => React.CSSProperties;
+  /** Extra props spread on each row (e.g. multi-select pointer handlers). */
+  getRowProps?: (item: T) => React.HTMLAttributes<HTMLTableRowElement>;
   stickyHeader?: boolean;
   /** Pixel offset for the sticky header (e.g. height of a page sticky filter bar). */
   headerOffset?: number;
@@ -50,6 +52,7 @@ export function ProjectTableBase<T>({
   getRowKey,
   leadingColumn,
   getRowStyle,
+  getRowProps,
   stickyHeader = false,
   headerOffset = 0,
   page: externalPage,
@@ -167,6 +170,7 @@ export function ProjectTableBase<T>({
                   className={getRowClass(item)}
                   style={getRowStyle ? getRowStyle(item) : undefined}
                   onClick={(e) => handleRowClick(item, e)}
+                  {...getRowProps?.(item)}
                 >
                   {leadingColumn && (
                     <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>

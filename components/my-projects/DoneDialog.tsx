@@ -14,6 +14,8 @@ import { Label } from "@/components/ui/label";
 interface DoneDialogProps {
   open: boolean;
   projectName: string;
+  /** Bulk mode: several projects get the same (optional) note. */
+  projectNames?: string[];
   onConfirm: (message: string | null) => void;
   onCancel: () => void;
 }
@@ -21,6 +23,7 @@ interface DoneDialogProps {
 export function DoneDialog({
   open,
   projectName,
+  projectNames,
   onConfirm,
   onCancel,
 }: DoneDialogProps) {
@@ -46,20 +49,41 @@ export function DoneDialog({
     }
   };
 
+  const isBulk = !!projectNames && projectNames.length > 1;
+
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && handleCancel()}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Mark Project as Done</DialogTitle>
+          <DialogTitle>
+            {isBulk ? `Mark ${projectNames.length} Projects as Done` : "Mark Project as Done"}
+          </DialogTitle>
         </DialogHeader>
         <div className="space-y-4 py-4">
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            You are about to mark{" "}
-            <span className="font-medium text-gray-900 dark:text-white">
-              &quot;{projectName}&quot;
-            </span>{" "}
-            as done.
-          </p>
+          {isBulk ?
+            <div className="space-y-2">
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                You are about to mark these projects as done:
+              </p>
+              <ul className="max-h-48 overflow-y-auto space-y-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 px-3 py-2">
+                {projectNames.map((name, index) => (
+                  <li
+                    key={`${index}-${name}`}
+                    className="text-sm font-medium text-gray-900 dark:text-white break-words"
+                  >
+                    {name}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          : <p className="text-sm text-gray-600 dark:text-gray-400">
+              You are about to mark{" "}
+              <span className="font-medium text-gray-900 dark:text-white">
+                &quot;{projectName}&quot;
+              </span>{" "}
+              as done.
+            </p>
+          }
 
           <div className="flex items-center gap-3">
             <Checkbox
@@ -75,7 +99,9 @@ export function DoneDialog({
               className="text-sm text-gray-700 dark:text-gray-300 cursor-pointer select-none"
             >
               Leave a note for the PM{" "}
-              <span className="text-gray-400 dark:text-gray-500">(optional)</span>
+              <span className="text-gray-400 dark:text-gray-500">
+                ({isBulk ? "optional, same for all" : "optional"})
+              </span>
             </Label>
           </div>
 

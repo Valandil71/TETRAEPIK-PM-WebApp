@@ -25,7 +25,9 @@ import { getInstructionsPreview } from "@/utils/instructionsPreview";
 import { useInstructionExclusions } from "@/hooks/settings/useInstructionExclusions";
 import { useManagementPageStore } from "@/lib/stores/useManagementPageStore";
 import type { ProjectGroup } from "@/lib/projectGrouping";
-import { getGroupDisplayName } from "@/lib/projectGrouping";
+import { getGroupDisplayName, getGroupSelectionState } from "@/lib/projectGrouping";
+import { Checkbox } from "@/components/ui/checkbox";
+import type { ProjectSelection } from "@/hooks/project/useProjectSelection";
 
 interface ProjectWithTranslators {
   id: number;
@@ -113,6 +115,9 @@ interface ManagementTableProps {
   isCreatingStmProject: boolean;
   onEditDetails: (projectId: number) => void;
   onCompleteProject: (projectId: number) => void;
+  onSelectMultiple: (projectId: number) => void;
+  /** Multi-select mode: rows toggle (click or drag) instead of opening the project. */
+  selection?: ProjectSelection;
   editingProjectId: number | null;
   editFocusField: "words" | "lines";
   editWords: string;
@@ -147,6 +152,8 @@ export function ManagementTable({
   isCreatingStmProject,
   onEditDetails,
   onCompleteProject,
+  onSelectMultiple,
+  selection,
   editingProjectId,
   editFocusField,
   editWords,
@@ -172,8 +179,10 @@ export function ManagementTable({
   const getLanguageColorStyleLocal = (langIn: string, langOut: string) =>
     getLanguageColorStyle(langIn, langOut, getLanguageColorPreview);
 
+  const isSelecting = !!selection?.isActive;
+
   const handleRowClick = (project: ProjectWithTranslators, e: React.MouseEvent) => {
-    if ((e.target as HTMLElement).closest("button")) {
+    if (isSelecting || (e.target as HTMLElement).closest("button")) {
       return;
     }
     rememberReturnProject(project.id);
@@ -254,7 +263,20 @@ export function ManagementTable({
                 <Fragment key={group.key}>
                   {isGrouped && (
                     <tr className="border-b border-gray-200 dark:border-gray-700 bg-blue-50/60 dark:bg-blue-900/10">
-                      <td colSpan={9} className="px-6 py-3">
+                      {isSelecting && (() => {
+                        const groupIds = group.projects.map((project) => project.id);
+                        const state = getGroupSelectionState(groupIds, selection.selectedIds);
+                        return (
+                          <td className="px-6 py-3 w-4">
+                            <Checkbox
+                              checked={state === "indeterminate" ? "indeterminate" : state === "checked"}
+                              onCheckedChange={() => selection.setMany(groupIds, state !== "checked")}
+                              aria-label={`Select all projects in ${group.name}`}
+                            />
+                          </td>
+                        );
+                      })()}
+                      <td colSpan={isSelecting ? 8 : 9} className="px-6 py-3">
                         <button
                           type="button"
                           onClick={() => onToggleGroup(group.key)}
@@ -277,15 +299,19 @@ export function ManagementTable({
                   )}
 
                   {(isGrouped ? isExpanded : true) &&
-                    group.projects.map((project) => (
+                    group.projects.map((project) => {
+                      const isSelected = isSelecting && selection.isSelected(project.id);
+                      return (
                       <tr
                         key={project.id}
                         className={`border-b border-gray-200 dark:border-gray-700 transition-colors cursor-pointer ${
-                          isGrouped ? "bg-blue-50/30 dark:bg-blue-900/5 hover:bg-blue-50 dark:hover:bg-blue-900/10"
+                          isSelected ? "bg-blue-100 dark:bg-blue-900/40 hover:bg-blue-100 dark:hover:bg-blue-900/40"
+                          : isGrouped ? "bg-blue-50/30 dark:bg-blue-900/5 hover:bg-blue-50 dark:hover:bg-blue-900/10"
                           : "hover:bg-blue-50 dark:hover:bg-blue-900/10"
-                        }`}
+                        } ${isSelecting ? "select-none" : ""}`}
                         data-management-project-id={project.id}
                         onClick={(e) => handleRowClick(project, e)}
+                        {...(isSelecting ? selection.getItemProps(project.id) : {})}
                       >
                         <td className={`px-6 py-4 relative ${isGrouped ? "pl-10" : ""}`}>
                           {isGrouped && (
@@ -294,7 +320,14 @@ export function ManagementTable({
                               <div className="absolute left-3 top-1/2 h-px w-3 bg-blue-200/70 dark:bg-blue-800/50" />
                             </>
                           )}
-                          <ProjectColorLegendTooltip
+                          {isSelecting ?
+                            <Checkbox
+                              checked={isSelected}
+                              tabIndex={-1}
+                              className="pointer-events-none"
+                              aria-label={`Select ${project.name}`}
+                            />
+                          : <ProjectColorLegendTooltip
                             status={project.status}
                             system={project.system}
                             langIn={project.language_in}
@@ -314,6 +347,7 @@ export function ManagementTable({
                               />
                             </div>
                           </ProjectColorLegendTooltip>
+                          }
                         </td>
                         <td className="px-6 py-4">
                           <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-gray-900 dark:text-blue-400 text-sm">
@@ -466,7 +500,7 @@ export function ManagementTable({
                                 exclusionSet,
                               });
                             const canOpenInstructions =
-                              !!onInstructionsClick && hasAnyInstructions;
+                              !isSelecting && !!onInstructionsClick && hasAnyInstructions;
 
                             return (
                               <span
@@ -511,11 +545,14 @@ export function ManagementTable({
                               onCompleteProject={() =>
                                 onCompleteProject(project.id)
                               }
+                              onSelectMultiple={() => onSelectMultiple(project.id)}
+                              hasTranslators={project.translators.length > 0}
                             />
                           </div>
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                 </Fragment>
               );
             })}
