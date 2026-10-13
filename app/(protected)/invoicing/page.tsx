@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
-import { X, Loader2, AlertCircle } from "lucide-react";
+import { X, Loader2, AlertCircle, Receipt, Banknote, CheckCheck } from "lucide-react";
+import { BulkSelectionBar } from "@/components/shared/BulkSelectionBar";
 import { useUser } from "@/hooks/user/useUser";
 import { useProjectsWithTranslators } from "@/hooks/project/useProjectsWithTranslators";
 import { useSapInstructionPreviews } from "@/hooks/project/useSapInstructionPreviews";
@@ -52,7 +53,6 @@ export default function InvoicingPage() {
 function InvoicingContent() {
   const { loading: userLoading } = useUser();
   const queryClient = useQueryClient();
-  const collapsed = useLayoutStore((state) => state.collapsed);
   const groupExpansionMode = useLayoutStore((state) => state.groupExpansionMode);
 
   // Measure the sticky filter bar so the sticky table header can pin below it.
@@ -696,66 +696,41 @@ function InvoicingContent() {
       />
 
       {/* Confirm Button Bar */}
-      {selectedProjects.size > 0 && (
-        <div
-          className={`fixed bottom-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 shadow-lg z-50 transition-all duration-300 ${
-            collapsed ? "left-20" : "left-52"
-          }`}
-        >
-          <div className="max-w-screen-2xl mx-auto px-8 py-4 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="text-gray-900 dark:text-white">
-                <span className="font-semibold">{selectedProjects.size}</span>{" "}
-                project{selectedProjects.size !== 1 ? "s" : ""} selected
-              </div>
-              <button
-                onClick={() => setSelectedProjects(new Set())}
-                className="px-4 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-red-100 dark:hover:bg-red-900/30 text-gray-700 dark:text-gray-300 hover:text-red-600 dark:hover:text-red-400 rounded-lg transition-colors border border-gray-200 dark:border-gray-600 hover:border-red-300 dark:hover:border-red-800"
-                type="button"
-              >
-                Clear selection
-              </button>
-            </div>
-            <div className="flex gap-3">
-              {showConfirmInvoicedAction && (
-                <button
-                  onClick={() => openConfirmDialog("invoiced")}
-                  disabled={markInvoicedMutation.isPending}
-                  className="px-6 py-3 cursor-pointer bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                  type="button"
-                >
-                  {markInvoicedMutation.isPending ?
-                    "Processing..."
-                  : "Confirm Invoiced"}
-                </button>
-              )}
-              {showConfirmPaidAndInvoicedAction && (
-                <button
-                  onClick={() => openConfirmDialog("paidAndInvoiced")}
-                  disabled={markPaidAndInvoicedMutation.isPending}
-                  className="px-6 py-3 cursor-pointer bg-purple-500 hover:bg-purple-600 text-white rounded-lg transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                  type="button"
-                >
-                  {markPaidAndInvoicedMutation.isPending ?
-                    "Processing..."
-                  : "Confirm Paid & Invoiced"}
-                </button>
-              )}
-              {showConfirmPaidAction && (
-                <button
-                  onClick={() => openConfirmDialog("paid")}
-                  disabled={markPaidMutation.isPending}
-                  className="px-6 py-3 cursor-pointer bg-green-500 hover:bg-green-600 text-white rounded-lg transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                  type="button"
-                >
-                  {markPaidMutation.isPending ?
-                    "Processing..."
-                  : "Confirm Paid"}
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
+      {selectedProjects.size > 0 && !confirmDialogOpen && (
+        <BulkSelectionBar
+          count={selectedProjects.size}
+          cancelLabel="Clear selection"
+          onCancel={() => setSelectedProjects(new Set())}
+          actions={[
+            ...(showConfirmInvoicedAction ?
+              [{
+                label: "Confirm Invoiced",
+                icon: Receipt,
+                className: "bg-blue-500 hover:bg-blue-600",
+                onClick: () => openConfirmDialog("invoiced"),
+                isLoading: markInvoicedMutation.isPending,
+              }]
+            : []),
+            ...(showConfirmPaidAndInvoicedAction ?
+              [{
+                label: "Confirm Paid & Invoiced",
+                icon: CheckCheck,
+                className: "bg-purple-500 hover:bg-purple-600",
+                onClick: () => openConfirmDialog("paidAndInvoiced"),
+                isLoading: markPaidAndInvoicedMutation.isPending,
+              }]
+            : []),
+            ...(showConfirmPaidAction ?
+              [{
+                label: "Confirm Paid",
+                icon: Banknote,
+                className: "bg-green-500 hover:bg-green-600",
+                onClick: () => openConfirmDialog("paid"),
+                isLoading: markPaidMutation.isPending,
+              }]
+            : []),
+          ]}
+        />
       )}
 
       <ConfirmationDialog

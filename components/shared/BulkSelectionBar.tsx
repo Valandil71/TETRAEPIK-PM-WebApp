@@ -1,30 +1,41 @@
 "use client";
 
 import type { LucideIcon } from "lucide-react";
-import { X } from "lucide-react";
+import { Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export interface BulkSelectionAction {
   label: string;
-  icon: LucideIcon;
+  icon?: LucideIcon;
   onClick: () => void;
   /** Tailwind classes for the button colour. */
   className: string;
   disabled?: boolean;
+  /** Shows a spinner and "Processing..." while the action runs. */
+  isLoading?: boolean;
 }
 
 interface BulkSelectionBarProps {
   count: number;
   actions: BulkSelectionAction[];
   onCancel: () => void;
+  /** Label of the button that leaves/clears the selection. */
+  cancelLabel?: string;
   hint?: string;
 }
 
 /**
- * Floating bar shown while a list is in multi-select mode. It moves up when the push
- * notification banner (also bottom-centre) is showing, so neither covers the other.
+ * Floating bar shown while projects are selected (Manage Projects, My Projects, Invoicing).
+ * It moves up when the push-notification banner (also bottom-centre) is showing, so neither
+ * covers the other (see globals.css).
  */
-export function BulkSelectionBar({ count, actions, onCancel, hint }: BulkSelectionBarProps) {
+export function BulkSelectionBar({
+  count,
+  actions,
+  onCancel,
+  cancelLabel = "Cancel",
+  hint,
+}: BulkSelectionBarProps) {
   return (
     <div
       data-bulk-selection-bar
@@ -39,20 +50,22 @@ export function BulkSelectionBar({ count, actions, onCancel, hint }: BulkSelecti
         )}
       </div>
       <div className="flex items-center gap-2">
-        {actions.map(({ label, icon: Icon, onClick, className, disabled }) => (
+        {actions.map(({ label, icon: Icon, onClick, className, disabled, isLoading }) => (
           <Button
             key={label}
             onClick={onClick}
-            disabled={disabled || count === 0}
+            disabled={disabled || isLoading || count === 0}
             className={`text-white ${className}`}
           >
-            <Icon className="w-4 h-4 mr-1.5" />
-            {label}
+            {isLoading ?
+              <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
+            : Icon && <Icon className="w-4 h-4 mr-1.5" />}
+            {isLoading ? "Processing..." : label}
           </Button>
         ))}
         <Button variant="outline" onClick={onCancel}>
           <X className="w-4 h-4 mr-1.5" />
-          Cancel
+          {cancelLabel}
         </Button>
       </div>
     </div>
