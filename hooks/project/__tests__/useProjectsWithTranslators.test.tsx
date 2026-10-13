@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   PROJECT_LIST_PAGE_SIZE,
+  PROJECT_LIST_PARALLEL_PAGES,
   useProjectsWithTranslators,
 } from "@/hooks/project/useProjectsWithTranslators";
 import {
@@ -74,6 +75,12 @@ const entry = (text: string): SapInstructionEntry => ({
 });
 
 const user = { id: "u1", name: "Ana", short_name: "AN", role: "translator", avatar: null };
+// Assignments carry only the user id; the users list is fetched alongside the projects
+const assignment = (userId: string) => ({
+  assignment_status: "claimed",
+  done_message: null,
+  user_id: userId,
+});
 
 const projectRow = (id: number, instructions: string | null, assignments: unknown[] = []) => ({
   id,
@@ -98,11 +105,13 @@ function defaultResolver(query: RecordedQuery): unknown[] {
   if (query.table === "instruction_exclusions_v2") {
     return [{ id: 1, normalized_text: "boilerplate", is_active: true }];
   }
+  if (query.table === "users") return [user];
   const inFilter = query.filters.find(([name, column]) => name === "in" && column === "id");
   if (!inFilter) {
     if (pageStart(query) > 0) return [];
     const rows = [
-      projectRow(1, "Use glossary", [{ assignment_status: "claimed", done_message: null, users: user }]),
+      // u2 no longer exists: its assignment is skipped
+      projectRow(1, "Use glossary", [assignment("u1"), assignment("u2")]),
       projectRow(2, null),
       projectRow(3, "   "),
       projectRow(4, ""),
@@ -158,6 +167,9 @@ describe("useProjectsWithTranslators", () => {
       "sap_instructions"
     );
     expect(listQuery.select).toContain("projects_assignment (");
+    // Each assignment carries the user id only; users are mapped from the users list
+    expect(listQuery.select).toContain("user_id");
+    expect(listQuery.select).not.toContain("users (");
     expect(listQuery.filters).toContainEqual(["in", "status", ["active"]]);
     expect(recorded.some((q) => q.table === "projects_assignment")).toBe(false);
 
@@ -178,8 +190,10 @@ describe("useProjectsWithTranslators", () => {
     const listQueries = recorded.filter(
       (q) => q.table === "projects" && q.filters.some(([, column]) => column === "status")
     );
-    expect(listQueries).toHaveLength(1);
-    expect(listQueries[0].filters).toContainEqual(["in", "status", ["active", "pending_review"]]);
+    expect(listQueries.length).toBeGreaterThan(0);
+    for (const listQuery of listQueries) {
+      expect(listQuery.filters).toContainEqual(["in", "status", ["active", "pending_review"]]);
+    }
   });
 
   it("shows the list without waiting for the exclusions", async () => {
@@ -201,8 +215,8 @@ describe("useProjectsWithTranslators", () => {
 
     // First entries come with the list: no separate request for them
     expect(
-      recorded.filter((q) => q.table === "projects" && q.select.includes("sap_first"))
-    ).toHaveLength(1);
+      recorded.some((q) => q.select.includes("sap_first") && !q.filters.some(([, c]) => c === "status"))
+    ).toBe(false);
     expect(recorded.some((q) => q.table === "instruction_exclusions_v2")).toBe(true);
 
     // Only the projects whose first entry is excluded need the full array (after the list)
@@ -244,29 +258,55 @@ describe("useProjectsWithTranslators", () => {
     }
   });
 
-  it("loads every completed project page by page and skips SAP data", async () => {
-    const total = PROJECT_LIST_PAGE_SIZE * 2 + 25;
+  function renderCompleteList(total: number) {
     const rows = Array.from({ length: total }, (_, i) => projectRow(i + 1, null));
     resolve = (query) => {
+      if (query.table === "users") return [user];
       const from = pageStart(query);
       return rows.slice(from, from + PROJECT_LIST_PAGE_SIZE);
     };
+    return renderHook(() => useProjectsWithTranslators(false, true, "complete"), { wrapper });
+  }
 
-    const { result } = renderHook(() => useProjectsWithTranslators(false, true, "complete"), { wrapper });
+  const pageRanges = () =>
+    recorded
+      .filter((q) => q.table === "projects")
+      .map((q) => q.filters.find(([name]) => name === "range"));
+
+  it("loads every completed project with the pages requested together, skipping SAP data", async () => {
+    const total = PROJECT_LIST_PAGE_SIZE * 2 + 25;
+    let releasePages = () => {};
+    blocked = { projects: new Promise<void>((done) => (releasePages = done)) };
+    const { result } = renderCompleteList(total);
+
+    // All three pages are requested before any of them answers
+    await waitFor(() => expect(pageRanges()).toHaveLength(PROJECT_LIST_PARALLEL_PAGES));
+    releasePages();
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
     expect(result.current.data).toHaveLength(total);
-    expect(recorded.map((q) => q.filters.find(([name]) => name === "range"))).toEqual([
+    expect(pageRanges()).toEqual([
       ["range", 0, 999],
       ["range", 1000, 1999],
       ["range", 2000, 2999],
     ]);
     expect(
-      recorded.every((q) => q.filters.some((f) => f[0] === "in" && f[1] === "status" && (f[2] as string[]).join() === "complete"))
+      recorded
+        .filter((q) => q.table === "projects")
+        .every((q) => q.filters.some((f) => f[0] === "in" && f[1] === "status" && (f[2] as string[]).join() === "complete"))
     ).toBe(true);
     // Completed lists load SAP previews per visible page instead
     expect(recorded.some((q) => q.select.includes("sap"))).toBe(false);
     expect(result.current.data!.every((p) => p.sap_instructions === null)).toBe(true);
+  });
+
+  it("requests the next batch of pages when the last one is full", async () => {
+    const total = PROJECT_LIST_PAGE_SIZE * PROJECT_LIST_PARALLEL_PAGES + 10;
+    const { result } = renderCompleteList(total);
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(result.current.data).toHaveLength(total);
+    expect(pageRanges()).toHaveLength(PROJECT_LIST_PARALLEL_PAGES * 2);
   });
 });
 

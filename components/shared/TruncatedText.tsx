@@ -38,6 +38,9 @@ export function TruncatedText({
 }: TruncatedTextProps) {
   const ref = useRef<HTMLSpanElement>(null);
   const [open, setOpen] = useState(false);
+  // The tooltip is only mounted once the text is hovered: a list renders hundreds of these,
+  // and mounting a tooltip for each one up front made big lists slow to appear.
+  const [hovered, setHovered] = useState(false);
   const isClickable = !!onClick || copyValue !== undefined;
 
   const handleClick = async (e: React.MouseEvent) => {
@@ -55,6 +58,24 @@ export function TruncatedText({
     }
   };
 
+  const textSpan = (
+    <span
+      ref={ref}
+      onClick={isClickable ? handleClick : undefined}
+      onPointerEnter={hovered ? undefined : () => setHovered(true)}
+      className={cn(
+        "break-words",
+        LINE_CLAMP[lines],
+        isClickable && "cursor-pointer hover:text-blue-500 dark:hover:text-blue-400 transition-colors",
+        className
+      )}
+    >
+      {text}
+    </span>
+  );
+
+  if (!hovered) return textSpan;
+
   return (
     <TooltipProvider delayDuration={300}>
       <Tooltip
@@ -65,20 +86,7 @@ export function TruncatedText({
           setOpen(next && isCut);
         }}
       >
-        <TooltipTrigger asChild>
-          <span
-            ref={ref}
-            onClick={isClickable ? handleClick : undefined}
-            className={cn(
-              "break-words",
-              LINE_CLAMP[lines],
-              isClickable && "cursor-pointer hover:text-blue-500 dark:hover:text-blue-400 transition-colors",
-              className
-            )}
-          >
-            {text}
-          </span>
-        </TooltipTrigger>
+        <TooltipTrigger asChild>{textSpan}</TooltipTrigger>
         <TooltipContent className="max-w-md whitespace-pre-wrap break-words text-sm">
           {text}
         </TooltipContent>

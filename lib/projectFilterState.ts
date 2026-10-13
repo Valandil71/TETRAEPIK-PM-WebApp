@@ -27,3 +27,16 @@ export const DEFAULT_PROJECT_FILTER_STATE: ProjectFilterState = {
 export function createDefaultProjectFilterState(): ProjectFilterState {
   return { ...DEFAULT_PROJECT_FILTER_STATE };
 }
+
+/** Whether any of the common filters (or the search) narrows the list. */
+export function hasActiveProjectFilterState(filters: ProjectFilterState): boolean {
+  return (
+    filters.searchTerm.trim() !== "" ||
+    !!filters.systemFilter ||
+    !!filters.dueDateFilter ||
+    !!filters.assignmentStatusFilter ||
+    !!filters.sourceLangFilter ||
+    !!filters.targetLangFilter ||
+    !!filters.lengthFilter
+  );
+}

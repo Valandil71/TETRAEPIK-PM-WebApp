@@ -73,6 +73,20 @@ export function compareProjectsByClosestDeadline<T extends ProjectDeadlineShape>
   return dateA.getTime() - dateB.getTime();
 }
 
+/** Latest closest deadline first; projects without deadlines still go last. */
+export function compareProjectsByClosestDeadlineDesc<T extends ProjectDeadlineShape>(
+  a: T,
+  b: T
+): number {
+  const dateA = getClosestProjectDeadline(a);
+  const dateB = getClosestProjectDeadline(b);
+
+  if (!dateA && !dateB) return 0;
+  if (!dateA) return 1;
+  if (!dateB) return -1;
+  return dateB.getTime() - dateA.getTime();
+}
+
 /** Keep raw DB name semantics: exact string match only. */
 export function groupProjectsByExactName<T extends { id: number; name: string }>(
   projects: T[]

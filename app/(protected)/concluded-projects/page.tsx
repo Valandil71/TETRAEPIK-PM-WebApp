@@ -4,7 +4,7 @@ import { useMemo, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, AlertCircle, FileDown, X } from "lucide-react";
 import { useUser } from "@/hooks/user/useUser";
-import { useProjectsWithTranslators } from "@/hooks/project/useProjectsWithTranslators";
+import { useCompletedProjects } from "@/hooks/project/useCompletedProjects";
 import { useSapInstructionPreviews } from "@/hooks/project/useSapInstructionPreviews";
 import { useProjectFilters } from "@/hooks/project/useProjectFilters";
 import {
@@ -16,6 +16,7 @@ import { ViewToggle } from "@/components/general/ViewToggle";
 import { SearchBar } from "@/components/general/SearchBar";
 import { ScrollToTopButton } from "@/components/general/ScrollToTopButton";
 import { Pagination } from "@/components/ui/pagination";
+import { LoadingAllProjects } from "@/components/shared/LoadingAllProjects";
 import { ConcludedTable } from "@/components/concluded/ConcludedTable";
 import { ConcludedCard } from "@/components/concluded/ConcludedCard";
 import { ExportProjectsDialog } from "@/components/management/ExportProjectsDialog";
@@ -26,14 +27,19 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useLayoutStore } from "@/lib/stores/useLayoutStore";
 import { useConcludedProjectsPageStore } from "@/lib/stores/useConcludedProjectsPageStore";
 import {
-  compareProjectsByClosestDeadline,
+  compareProjectsByClosestDeadlineDesc,
   groupProjectsForDisplay,
 } from "@/lib/projectGrouping";
+import { hasActiveProjectFilterState } from "@/lib/projectFilterState";
+import type { ProjectWithTranslators } from "@/types/project";
 import { useProjectGroupExpansion } from "@/hooks/project/useProjectGroupExpansion";
 import { useProjectListPagination } from "@/hooks/project/useProjectListPagination";
 import { useWindowScrollMemory } from "@/hooks/ui/useWindowScrollMemory";
 import { useStickyHeaderOffset } from "@/hooks/ui/useStickyHeaderOffset";
 import { restoreWindowScrollY } from "@/utils/scrollRestoration";
+
+// Stable fallback while loading, so the memos below do not recompute on every render
+const EMPTY_PROJECTS: ProjectWithTranslators[] = [];
 
 export default function ConcludedProjectsPage() {
   return (
@@ -71,17 +77,15 @@ function ConcludedProjectsContent() {
   // Measure the sticky filter bar so the sticky table header pins below it.
   const { ref: filtersRef, offset: headerOffset } = useStickyHeaderOffset();
 
-  // Fetch all projects (includeAllStatuses) and keep only completed ones.
+  // All completed projects. On the first page without filters, the first rows (latest
+  // deadline first, the order below) show while the full list loads.
+  const canPreview = storedCurrentPage <= 1 && !hasActiveProjectFilterState(storedFilters);
   const {
-    data: projectsData = [],
+    projects: completedProjects = EMPTY_PROJECTS,
+    isPartial,
     isLoading: projectsLoading,
     error: projectsError,
-  } = useProjectsWithTranslators(false, true, "complete");
-
-  const completedProjects = useMemo(
-    () => projectsData.filter((p) => p.status === "complete"),
-    [projectsData]
-  );
+  } = useCompletedProjects(canPreview ? { order: "desc" } : null);
 
   const maxDueDate = getTodayInLisbon();
 
@@ -117,7 +121,8 @@ function ConcludedProjectsContent() {
 
   const filteredProjects = useMemo(() => {
     const projects = applyBaseFilters([...completedProjects]);
-    return projects.sort(compareProjectsByClosestDeadline);
+    // Latest deadline first: the most recently concluded work at the top
+    return projects.sort(compareProjectsByClosestDeadlineDesc);
   }, [completedProjects, applyBaseFilters]);
 
   const groupedProjects = useMemo(
@@ -235,7 +240,11 @@ function ConcludedProjectsContent() {
         ref={filtersRef}
         className="sticky top-0 z-40 bg-gray-50 dark:bg-gray-900 backdrop-blur-sm shadow-md mb-6 pt-4 pb-4 -mx-8 px-8"
       >
-        <div className="space-y-4">
+        {/* Searching and filtering need the full list: unavailable until it has loaded */}
+        <div
+          className={`space-y-4 transition-opacity ${isPartial ? "opacity-60" : ""}`}
+          inert={isPartial}
+        >
           <div className="flex items-center gap-3">
             <div className="flex-1">
               <SearchBar
@@ -353,14 +362,17 @@ function ConcludedProjectsContent() {
         />
       )}
 
-      <Pagination
-        currentPage={currentPage}
-        totalPages={totalPages}
-        onPageChange={setCurrentPage}
-        itemsPerPage={itemsPerPage}
-        totalItems={totalItems}
-        className="mb-6 rounded-2xl border border-gray-200 dark:border-gray-700"
-      />
+      {isPartial ?
+        <LoadingAllProjects />
+      : <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+          itemsPerPage={itemsPerPage}
+          totalItems={totalItems}
+          className="mb-6 rounded-2xl border border-gray-200 dark:border-gray-700"
+        />
+      }
 
       <ScrollToTopButton />
 

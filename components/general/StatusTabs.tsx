@@ -3,7 +3,8 @@
 interface Tab<T extends string> {
   id: T;
   label: string;
-  count: number;
+  /** Omitted while the count is not known yet (e.g. the list is still loading). */
+  count?: number;
 }
 
 interface StatusTabsProps<T extends string> {
@@ -30,7 +31,8 @@ export function StatusTabs<T extends string>({
           }`}
           type="button"
         >
-          {tab.label} ({tab.count})
+          {tab.label}
+          {tab.count !== undefined && ` (${tab.count})`}
         </button>
       ))}
     </div>

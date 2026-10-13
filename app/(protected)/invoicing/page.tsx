@@ -4,7 +4,10 @@ import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { X, Loader2, AlertCircle, Receipt, Banknote, CheckCheck } from "lucide-react";
 import { BulkSelectionBar } from "@/components/shared/BulkSelectionBar";
 import { useUser } from "@/hooks/user/useUser";
-import { useProjectsWithTranslators } from "@/hooks/project/useProjectsWithTranslators";
+import {
+  useCompletedProjects,
+  type CompletedPreviewFilter,
+} from "@/hooks/project/useCompletedProjects";
 import { useSapInstructionPreviews } from "@/hooks/project/useSapInstructionPreviews";
 import { useProjectFilters } from "@/hooks/project/useProjectFilters";
 import {
@@ -16,6 +19,7 @@ import { ViewToggle } from "@/components/general/ViewToggle";
 import { SearchBar } from "@/components/general/SearchBar";
 import { StatusTabs } from "@/components/general/StatusTabs";
 import { Pagination } from "@/components/ui/pagination";
+import { LoadingAllProjects } from "@/components/shared/LoadingAllProjects";
 import { InvoicingTable } from "@/components/invoicing/InvoicingTable";
 import { InvoicingCard } from "@/components/invoicing/InvoicingCard";
 import { ConfirmationDialog } from "@/components/management/ConfirmationDialog";
@@ -39,8 +43,20 @@ import { useProjectListPagination } from "@/hooks/project/useProjectListPaginati
 import { useWindowScrollMemory } from "@/hooks/ui/useWindowScrollMemory";
 import { useStickyHeaderOffset } from "@/hooks/ui/useStickyHeaderOffset";
 import { restoreWindowScrollY } from "@/utils/scrollRestoration";
+import { hasActiveProjectFilterState } from "@/lib/projectFilterState";
+import type { ProjectWithTranslators } from "@/types/project";
 
 type ConfirmActionType = "invoiced" | "paid" | "paidAndInvoiced" | null;
+
+// Stable fallback while loading, so the memos below do not recompute on every render
+const EMPTY_PROJECTS: ProjectWithTranslators[] = [];
+
+/** The server filter matching a tab, for the first-page preview (see useCompletedProjects). */
+const TAB_PREVIEW_FILTER: Record<string, CompletedPreviewFilter> = {
+  all: "notFullyProcessed",
+  toBeInvoiced: "notInvoiced",
+  toBePaid: "invoicedNotPaid",
+};
 
 export default function InvoicingPage() {
   return (
@@ -102,17 +118,20 @@ function InvoicingContent() {
   const [confirmAction, setConfirmAction] = useState<ConfirmActionType>(null);
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
 
-  // Fetch all projects
+  // All completed projects. On the first page without filters, the first rows of the tab
+  // (unprocessed first, by deadline, as sorted below) show while the full list loads. With
+  // invoiced+paid projects shown on "All", the server cannot reproduce the order: no preview.
+  const canPreview =
+    storedCurrentPage <= 1 &&
+    !hasActiveProjectFilterState(storedFilters) &&
+    (hideFullyProcessed || activeTab !== "all");
   const {
-    data: projectsData = [],
+    projects: allProjectsRaw = EMPTY_PROJECTS,
+    isPartial,
     isLoading: projectsLoading,
     error: projectsError,
-  } = useProjectsWithTranslators(false, true, "complete");
-
-  // Filter to only show complete projects in invoicing
-  const allProjectsRaw = useMemo(
-    () => projectsData.filter((p) => p.status === "complete"),
-    [projectsData]
+  } = useCompletedProjects(
+    canPreview ? { order: "asc", filter: TAB_PREVIEW_FILTER[activeTab] } : null
   );
 
   // Common filters from hook
@@ -167,23 +186,24 @@ function InvoicingContent() {
   // Create tabs
   const tabs = useMemo(
     () => [
+      // Counts are only known once the full list has loaded
       {
         id: "all" as const,
         label: "All Projects",
-        count: allProjectsRaw.length,
+        count: isPartial ? undefined : allProjectsRaw.length,
       },
       {
         id: "toBeInvoiced" as const,
         label: "To be Invoiced",
-        count: categorizedProjects.toBeInvoiced.length,
+        count: isPartial ? undefined : categorizedProjects.toBeInvoiced.length,
       },
       {
         id: "toBePaid" as const,
         label: "To Be Paid",
-        count: categorizedProjects.toBePaid.length,
+        count: isPartial ? undefined : categorizedProjects.toBePaid.length,
       },
     ],
-    [allProjectsRaw, categorizedProjects]
+    [allProjectsRaw, categorizedProjects, isPartial]
   );
 
   // Filter projects
@@ -372,7 +392,9 @@ function InvoicingContent() {
     handleSelection(id);
   };
 
+  // Selecting needs the full list (a group may have rows that are not loaded yet)
   const handleSelection = (projectId: number) => {
+    if (isPartial) return;
     const newSelection = new Set(selectedProjects);
     if (newSelection.has(projectId)) {
       newSelection.delete(projectId);
@@ -383,6 +405,7 @@ function InvoicingContent() {
   };
 
   const handleGroupSelection = (groupKey: string) => {
+    if (isPartial) return;
     const group = paginatedProjectGroups.find((g) => g.key === groupKey);
     if (!group) return;
 
@@ -536,8 +559,11 @@ function InvoicingContent() {
           </div>
         </div>
 
-        {/* Search + Filters */}
-        <div className="space-y-4">
+        {/* Search + Filters: they need the full list, so unavailable until it has loaded */}
+        <div
+          className={`space-y-4 transition-opacity ${isPartial ? "opacity-60" : ""}`}
+          inert={isPartial}
+        >
           <SearchBar
             value={searchTerm}
             onChange={(value) => {
@@ -686,17 +712,20 @@ function InvoicingContent() {
         />
       }
 
-      <Pagination
-        currentPage={currentPage}
-        totalPages={totalPages}
-        onPageChange={setCurrentPage}
-        itemsPerPage={itemsPerPage}
-        totalItems={totalItems}
-        className="mb-6 rounded-2xl border border-gray-200 dark:border-gray-700"
-      />
+      {isPartial ?
+        <LoadingAllProjects />
+      : <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+          itemsPerPage={itemsPerPage}
+          totalItems={totalItems}
+          className="mb-6 rounded-2xl border border-gray-200 dark:border-gray-700"
+        />
+      }
 
-      {/* Confirm Button Bar */}
-      {selectedProjects.size > 0 && !confirmDialogOpen && (
+      {/* Confirm Button Bar (a kept selection waits for the full list) */}
+      {selectedProjects.size > 0 && !confirmDialogOpen && !isPartial && (
         <BulkSelectionBar
           count={selectedProjects.size}
           cancelLabel="Clear selection"

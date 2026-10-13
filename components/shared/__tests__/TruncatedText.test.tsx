@@ -26,6 +26,16 @@ describe("TruncatedText", () => {
     expect(onRowClick).not.toHaveBeenCalled();
   });
 
+  it("only mounts the tooltip once the text is hovered (lists render hundreds of these)", () => {
+    render(<TruncatedText text="Hover me" />);
+    const text = screen.getByText("Hover me");
+    // Radix marks its trigger with data-state; a plain span has none
+    expect(text).not.toHaveAttribute("data-state");
+
+    fireEvent.pointerEnter(text);
+    expect(screen.getByText("Hover me")).toHaveAttribute("data-state", "closed");
+  });
+
   it("runs a custom click instead of copying", () => {
     const onClick = vi.fn();
     render(<TruncatedText text="Instructions" onClick={onClick} />);

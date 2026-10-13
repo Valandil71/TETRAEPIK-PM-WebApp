@@ -33,6 +33,10 @@ export const queryKeys = {
     showPast === undefined
       ? (['projects-with-translators'] as const)
       : (['projects-with-translators', showPast, showAll, status] as const),
+  // First page of the complete list, shown while the full list loads (useCompletedProjects).
+  // Kept outside the projects-with-translators prefix so realtime changes do not refetch it.
+  completedProjectsPreview: (order: string, filter: string) =>
+    ['completed-projects-preview', order, filter] as const,
   sapInstructionPreviews: (projectIds?: number[]) =>
     projectIds === undefined
       ? (['sap-instruction-previews'] as const)

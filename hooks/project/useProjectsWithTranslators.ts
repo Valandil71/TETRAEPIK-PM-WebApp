@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { useSupabase } from '@/hooks/core/useSupabase';
 import type { ProjectWithTranslators, ProjectTranslator, SapInstructionEntry } from '@/types/project';
 import { getProjectListStatuses, queryKeys, type ProjectListStatus } from "@/lib/queryKeys";
@@ -12,22 +12,16 @@ import {
 } from '@/hooks/project/useSapInstructionPreviews';
 import { fetchInstructionExclusions } from '@/hooks/settings/useInstructionExclusions';
 import { toInstructionExclusionSet } from '@/lib/sap/instruction-exclusions';
-
-interface AssignmentUserRow {
-  id: string;
-  name: string;
-  short_name: string | null;
-  role: string;
-  avatar: string | null;
-}
+import { fetchUsers, USERS_STALE_TIME } from '@/hooks/user/useUsers';
+import type { User } from '@/types/user';
 
 interface ProjectAssignmentRow {
   assignment_status: ProjectTranslator["assignment_status"];
   done_message: string | null;
-  users: AssignmentUserRow | null;
+  user_id: string;
 }
 
-type ProjectListRow = Omit<ProjectWithTranslators, "translators" | "sap_instructions"> & {
+export type ProjectListRow = Omit<ProjectWithTranslators, "translators" | "sap_instructions"> & {
   projects_assignment: ProjectAssignmentRow[] | null;
   /** Only selected for working lists (see PROJECT_LIST_SAP_FIRST). */
   sap_first?: SapInstructionEntry | null;
@@ -36,7 +30,9 @@ type ProjectListRow = Omit<ProjectWithTranslators, "translators" | "sap_instruct
 // `sap_instructions` is deliberately not selected here: it is ~95% of the list payload.
 // See loadSapInstructionPreviews for how the list still gets what the previews need.
 // created_at/updated_at are not selected either: no list view reads them.
-const PROJECT_LIST_SELECT = `
+// Assignments carry only the user id: the users are a handful, fetched once and mapped in
+// (toProjectWithTranslators), instead of repeating each one in every assignment.
+export const PROJECT_LIST_SELECT = `
   id,
   name,
   system,
@@ -55,13 +51,7 @@ const PROJECT_LIST_SELECT = `
   projects_assignment (
     assignment_status,
     done_message,
-    users (
-      id,
-      name,
-      short_name,
-      role,
-      avatar
-    )
+    user_id
   )
 `;
 
@@ -72,31 +62,96 @@ const PROJECT_LIST_SAP_FIRST = `, sap_first:sap_instructions->0`;
 // PostgREST returns at most this many rows per request (the project's db-max-rows),
 // so larger lists are fetched page by page.
 export const PROJECT_LIST_PAGE_SIZE = 1000;
+// Pages requested at once: the ~2,000-row complete list arrives in one round instead of one
+// round per page. A full last page means there may be more, so the next batch follows.
+export const PROJECT_LIST_PARALLEL_PAGES = 3;
+
+type SupabaseClient = ReturnType<typeof useSupabase>;
+
+async function fetchProjectListPage(
+  supabase: SupabaseClient,
+  select: string,
+  statuses: string[],
+  page: number
+): Promise<ProjectListRow[]> {
+  const from = page * PROJECT_LIST_PAGE_SIZE;
+  const { data, error } = await supabase
+    .from('projects')
+    .select(select)
+    .in('status', statuses)
+    .order('created_at', { ascending: false })
+    .order('id', { ascending: false }) // stable order across pages
+    .range(from, from + PROJECT_LIST_PAGE_SIZE - 1);
+
+  if (error) {
+    throw new Error(`Failed to fetch projects: ${error.message}`);
+  }
+  return (data ?? []) as unknown as ProjectListRow[];
+}
 
 async function fetchProjectListRows(
-  supabase: ReturnType<typeof useSupabase>,
+  supabase: SupabaseClient,
   status: ProjectListStatus,
   withSapFirst: boolean
 ): Promise<ProjectListRow[]> {
   const rows: ProjectListRow[] = [];
   const select = withSapFirst ? PROJECT_LIST_SELECT + PROJECT_LIST_SAP_FIRST : PROJECT_LIST_SELECT;
-  for (let from = 0; ; from += PROJECT_LIST_PAGE_SIZE) {
-    const { data, error } = await supabase
-      .from('projects')
-      .select(select)
-      .in('status', getProjectListStatuses(status))
-      .order('created_at', { ascending: false })
-      .order('id', { ascending: false }) // stable order across pages
-      .range(from, from + PROJECT_LIST_PAGE_SIZE - 1);
-
-    if (error) {
-      throw new Error(`Failed to fetch projects: ${error.message}`);
+  const statuses = getProjectListStatuses(status);
+  for (let first = 0; ; first += PROJECT_LIST_PARALLEL_PAGES) {
+    const pages = await Promise.all(
+      Array.from({ length: PROJECT_LIST_PARALLEL_PAGES }, (_, i) =>
+        fetchProjectListPage(supabase, select, statuses, first + i)
+      )
+    );
+    for (const page of pages) {
+      rows.push(...page);
+      if (page.length < PROJECT_LIST_PAGE_SIZE) return rows;
     }
-
-    const page = (data ?? []) as unknown as ProjectListRow[];
-    rows.push(...page);
-    if (page.length < PROJECT_LIST_PAGE_SIZE) return rows;
   }
+}
+
+/** Users by id, from the cached users list (see useUsers). */
+export async function fetchUsersById(
+  supabase: SupabaseClient,
+  queryClient: QueryClient
+): Promise<Map<string, User>> {
+  const users = await queryClient.fetchQuery({
+    queryKey: queryKeys.users(),
+    queryFn: () => fetchUsers(supabase),
+    staleTime: USERS_STALE_TIME,
+  });
+  return new Map(users.map((user) => [user.id, user]));
+}
+
+/**
+ * Turns a list row into the shape the views use: translators from the user map (an
+ * assignment whose user no longer exists is skipped) and, for rows without manual
+ * instructions, the first SAP entry as the instructions preview (the views filter it by
+ * the exclusions when rendering; see useExcludedFirstEntryPreviews).
+ */
+export function toProjectWithTranslators(
+  { projects_assignment, sap_first, ...project }: ProjectListRow,
+  usersById: Map<string, User>
+): ProjectWithTranslators {
+  const hasManualInstructions = getBlankInstructionIds([project]).length === 0;
+  return {
+    ...project,
+    sap_instructions: !hasManualInstructions && sap_first ? [sap_first] : null,
+    translators: (projects_assignment ?? []).flatMap((assignment) => {
+      const user = usersById.get(assignment.user_id);
+      return user ?
+          [{
+            id: user.id,
+            name: user.name,
+            short_name: user.short_name || null,
+            role: user.role,
+            assignment_status: assignment.assignment_status,
+            avatar: user.avatar || null,
+            done_message: assignment.done_message || null,
+          }]
+        : [];
+    }),
+  };
 }
 
 /**
@@ -111,42 +166,22 @@ export function useProjectsWithTranslators(
   status: ProjectListStatus = "active"
 ) {
   const supabase = useSupabase();
+  const queryClient = useQueryClient();
   // Working lists (not the ~2,000-row complete list) carry SAP previews
   const withPreviews = status !== "complete";
 
   const listQuery = useQuery({
     queryKey: queryKeys.projectsWithTranslators(showPast, showAll, status),
     queryFn: async (): Promise<ProjectWithTranslators[]> => {
-      // Assignments and the first SAP entry are embedded, so the list is one request.
-      const typedProjects = await fetchProjectListRows(supabase, status, withPreviews);
-
-      if (typedProjects.length === 0) {
-        return [];
-      }
-
-      // Rows without manual instructions get their first SAP entry as the preview; the views
-      // filter it by the exclusions when rendering (see useExcludedFirstEntryPreviews below).
-      const blankIds = new Set(getBlankInstructionIds(typedProjects));
+      // Assignments and the first SAP entry are embedded; the users come alongside.
+      const [typedProjects, usersById] = await Promise.all([
+        fetchProjectListRows(supabase, status, withPreviews),
+        fetchUsersById(supabase, queryClient),
+      ]);
 
       // Combine projects with their translators
-      const projectsWithTranslators: ProjectWithTranslators[] = typedProjects.map(
-        ({ projects_assignment, sap_first, ...project }) => ({
-          ...project,
-          sap_instructions: blankIds.has(project.id) && sap_first ? [sap_first] : null,
-          translators: (projects_assignment ?? []).flatMap((assignment) =>
-            assignment.users ?
-              [{
-                id: assignment.users.id,
-                name: assignment.users.name,
-                short_name: assignment.users.short_name || null,
-                role: assignment.users.role,
-                assignment_status: assignment.assignment_status,
-                avatar: assignment.users.avatar || null,
-                done_message: assignment.done_message || null,
-              }]
-            : []
-          ),
-        })
+      const projectsWithTranslators = typedProjects.map((row) =>
+        toProjectWithTranslators(row, usersById)
       );
 
       // Filter and sort projects based on showPast parameter

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   compareProjectsByClosestDeadline,
+  compareProjectsByClosestDeadlineDesc,
   groupProjectsForDisplay,
 } from "@/lib/projectGrouping";
 
@@ -35,6 +36,26 @@ describe("projectGrouping", () => {
     expect(ordered.map((project) => project.name)).toEqual([
       "Initial Only",
       "Final Only",
+      "No Deadline",
+    ]);
+  });
+
+  it("orders latest closest deadline first, keeping projects without deadlines last", () => {
+    const projects = [
+      makeProject(1, "Final Only", { final_deadline: "2026-04-27T13:00:00.000Z" }),
+      makeProject(2, "No Deadline"),
+      // Closest is the initial deadline, before "Final Only"
+      makeProject(3, "Early Initial", {
+        initial_deadline: "2026-04-23T07:00:00.000Z",
+        final_deadline: "2026-05-30T07:00:00.000Z",
+      }),
+    ];
+
+    const ordered = [...projects].sort(compareProjectsByClosestDeadlineDesc);
+
+    expect(ordered.map((project) => project.name)).toEqual([
+      "Final Only",
+      "Early Initial",
       "No Deadline",
     ]);
   });
