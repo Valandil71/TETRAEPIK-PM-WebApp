@@ -42,6 +42,7 @@ import {
   addMonths,
 } from "date-fns";
 import { countWorkingDays } from "@/lib/date-utils";
+import { getClosestProjectDeadline } from "@/lib/projectGrouping";
 
 const HOURS_PER_WORKDAY = 8;
 import { createBrowserClient } from "@supabase/ssr";
@@ -143,21 +144,15 @@ function WorkloadContent() {
     }
   }, [selectedPreset, customDate]);
 
-  // Get final deadline for a project
-  const getFinalDeadline = useCallback((project: (typeof activeProjects)[0]) => {
-    if (!project.final_deadline) return null;
-    const date = new Date(project.final_deadline);
-    return isNaN(date.getTime()) ? null : date;
-  }, []);
-
-  // Filter projects by target date and calculate totals
+  // Filter projects by target date and calculate totals. Uses the closest deadline, like the
+  // Projects page's Due Date filter: many SAP projects only have an initial deadline.
   const workloadStats = useMemo(() => {
     if (!targetDate) {
       return { projects: [], totalWords: 0, totalLines: 0, projectCount: 0 };
     }
 
     const filteredProjects = activeProjects.filter((project) => {
-      const deadline = getFinalDeadline(project);
+      const deadline = getClosestProjectDeadline(project);
       if (!deadline) return false;
       return (
         isBefore(deadline, targetDate) ||
@@ -180,7 +175,7 @@ function WorkloadContent() {
       totalLines,
       projectCount: filteredProjects.length,
     };
-  }, [activeProjects, targetDate, getFinalDeadline]);
+  }, [activeProjects, targetDate]);
 
   const datePresets: { id: DatePreset; label: string }[] = [
     { id: "today", label: "Today" },

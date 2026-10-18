@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { useUsers } from '@/hooks/user/useUsers';
 import { useProjectsWithTranslators } from "@/hooks/project/useProjectsWithTranslators";
 import type { ProjectListStatus } from "@/lib/queryKeys";
+import { getClosestProjectDeadline } from "@/lib/projectGrouping";
 
 export interface ProjectTranslatorInfo {
   id: string;
@@ -134,13 +135,9 @@ export function useUserWorkload(listStatus: ProjectListStatus = "active") {
       const wordsShare = Math.ceil((project.words || 0) / translatorCount);
       const linesShare = Math.ceil((project.lines || 0) / translatorCount);
 
-      // Use only final deadline
-      const projectDeadline = project.final_deadline
-        ? (() => {
-            const date = new Date(project.final_deadline);
-            return isNaN(date.getTime()) ? null : date;
-          })()
-        : null;
+      // Closest deadline, like the Projects page's Due Date filter: many SAP projects only
+      // have an initial deadline.
+      const projectDeadline = getClosestProjectDeadline(project);
 
       // Map translator info for this project
       const projectTranslators: ProjectTranslatorInfo[] = project.translators.map((t) => ({
