@@ -10,6 +10,9 @@ import { useMyProjects } from "@/hooks/project/useMyProjects";
 import { ProjectDetailsCard } from "@/components/project/ProjectDetailsCard";
 import { ProjectInstructionsCard } from "@/components/project/ProjectInstructionsCard";
 import { ProjectNotesCard } from "@/components/project/ProjectNotesCard";
+import { ProjectPmInstructionsCard } from "@/components/project/ProjectPmInstructionsCard";
+import { hasManualInstructions } from "@/lib/projects/manualFields";
+import { attachSapInstructionHtml } from "@/lib/sap/instructions";
 import { TranslatorsList } from "@/components/project/TranslatorsList";
 import { AddTranslatorDialog } from "@/components/management/AddTranslatorDialog";
 import { ReminderModal } from "@/components/project/ReminderModal";
@@ -501,6 +504,8 @@ export default function ProjectPage() {
   // Determine translator's assignment status for action buttons
   const assignmentStatus = translatorAssignment?.assignment_status;
   const hasProjectNotes = !!project.project_notes?.trim();
+  // Only text written by a PM: the SAP-composed "TA/TK/WL" text repeats the SAP Metadata block.
+  const pmInstructions = hasManualInstructions(project) ? project.instructions : null;
 
   return (
     <div className="p-8 max-w-7xl mx-auto">
@@ -627,9 +632,11 @@ export default function ProjectPage() {
               canEdit={false}
             />
           )}
+          {!canManageAssignments() && pmInstructions && (
+            <ProjectPmInstructionsCard instructions={pmInstructions} />
+          )}
           <ProjectInstructionsCard
-            instructions={null}
-            sapInstructions={project.sap_instructions}
+            sapInstructions={attachSapInstructionHtml(project.sap_instructions, project.sap_instructions_html)}
           />
         </div>
 
@@ -668,6 +675,7 @@ export default function ProjectPage() {
               notes={project.project_notes}
               canEdit={canManageAssignments()}
             />
+            {pmInstructions && <ProjectPmInstructionsCard instructions={pmInstructions} />}
           </div>
         )}
       </div>

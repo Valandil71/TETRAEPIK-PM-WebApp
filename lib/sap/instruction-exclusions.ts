@@ -16,6 +16,8 @@ export interface InstructionExclusionV2 {
 export interface UiSapInstruction {
   short: string;
   long: string;
+  /** SAP's HTML body, when stored; display only (exclusions always use `long || short`). */
+  html?: string;
   slsLang?: string;
 }
 
@@ -27,12 +29,19 @@ export function isExcludedInstruction(
   return exclusionSet.has(normalizeInstructionTextForMatch(text));
 }
 
+/**
+ * Match keys of the exclusions. Both the stored normalized_text and the raw_text are
+ * re-normalized, so exclusions saved by an older normalization still match.
+ */
 export function toInstructionExclusionSet(
-  exclusions: Array<Pick<InstructionExclusionV2, "normalized_text">>
+  exclusions: Array<Pick<InstructionExclusionV2, "normalized_text"> & { raw_text?: string | null }>
 ): Set<string> {
   return new Set(
     exclusions
-      .map((entry) => normalizeInstructionTextForMatch(entry.normalized_text))
+      .flatMap((entry) => [
+        normalizeInstructionTextForMatch(entry.normalized_text),
+        normalizeInstructionTextForMatch(entry.raw_text),
+      ])
       .filter((entry) => entry.length > 0)
   );
 }
@@ -58,7 +67,7 @@ export function filterSapInstructions(
     if (seen.has(matchKey)) continue;
     seen.add(matchKey);
 
-    cleaned.push({ short, long, slsLang: entry.slsLang });
+    cleaned.push({ short, long, html: entry.instructionLongHtml, slsLang: entry.slsLang });
   }
 
   return cleaned;

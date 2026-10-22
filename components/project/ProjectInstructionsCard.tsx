@@ -1,19 +1,19 @@
 "use client";
 
 import { useState } from "react";
-import { FileText, ClipboardList, ChevronDown, ChevronRight, Ban } from "lucide-react";
+import { FileText, ChevronDown, ChevronRight, Ban } from "lucide-react";
 import type { SapInstructionEntry } from "@/types/project";
 import { useInstructionExclusions } from "@/hooks/settings/useInstructionExclusions";
-import { filterSapInstructions } from "@/lib/sap/instruction-exclusions";
+import { filterSapInstructions, type UiSapInstruction } from "@/lib/sap/instruction-exclusions";
+import { SapInstructionBody } from "@/components/project/SapInstructionBody";
 import { useRoleAccess } from "@/hooks/user/useRoleAccess";
 
 interface ProjectInstructionsCardProps {
-  instructions: string | null | undefined;
   sapInstructions?: SapInstructionEntry[] | null;
 }
 
+/** SAP instructions of a project. PM-written instructions are in ProjectPmInstructionsCard. */
 export function ProjectInstructionsCard({
-  instructions,
   sapInstructions,
 }: ProjectInstructionsCardProps) {
   const { user, isPmOrAdmin } = useRoleAccess();
@@ -23,7 +23,6 @@ export function ProjectInstructionsCard({
     isAdding,
   } = useInstructionExclusions(user?.id ?? null);
   const visibleSapInstructions = filterSapInstructions(sapInstructions, exclusionSet);
-  const hasInstructions = instructions && instructions.trim() !== "";
   const hasSapInstructions = visibleSapInstructions.length > 0;
   const canExcludeSapInstructions = isPmOrAdmin() && !!user?.id;
 
@@ -32,46 +31,26 @@ export function ProjectInstructionsCard({
     addExclusion(text);
   };
 
-  if (!hasInstructions && !hasSapInstructions) {
+  if (!hasSapInstructions) {
     return (
       <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-6">
         <h2 className="text-gray-900 dark:text-white mb-4 text-xl font-semibold">
-          Instructions
+          SAP Instructions
         </h2>
         <p className="text-gray-500 dark:text-gray-400 italic">
-          No instructions available
+          No SAP instructions available
         </p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {hasSapInstructions && (
-        <SapInstructionsSection
-          entries={visibleSapInstructions}
-          canExclude={canExcludeSapInstructions}
-          isExcluding={isAdding}
-          onExclude={handleExcludeSapInstruction}
-        />
-      )}
-
-      {hasInstructions && (
-        <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-6">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
-              <ClipboardList className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-            </div>
-            <h2 className="text-gray-900 dark:text-white text-xl font-semibold">
-              Instructions
-            </h2>
-          </div>
-          <p className="text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-line">
-            {instructions}
-          </p>
-        </div>
-      )}
-    </div>
+    <SapInstructionsSection
+      entries={visibleSapInstructions}
+      canExclude={canExcludeSapInstructions}
+      isExcluding={isAdding}
+      onExclude={handleExcludeSapInstruction}
+    />
   );
 }
 
@@ -81,7 +60,7 @@ function SapInstructionsSection({
   isExcluding,
   onExclude,
 }: {
-  entries: Array<{ short: string; long: string; slsLang?: string }>;
+  entries: UiSapInstruction[];
   canExclude: boolean;
   isExcluding: boolean;
   onExclude: (text: string) => void;
@@ -102,6 +81,7 @@ function SapInstructionsSection({
             key={i}
             short={entry.short}
             long={entry.long}
+            html={entry.html}
             slsLang={entry.slsLang}
             canExclude={canExclude}
             isExcluding={isExcluding}
@@ -116,12 +96,14 @@ function SapInstructionsSection({
 function CollapsibleInstruction({
   short,
   long,
+  html,
   canExclude,
   isExcluding,
   onExclude,
 }: {
   short: string;
   long: string;
+  html?: string;
   slsLang?: string;
   canExclude: boolean;
   isExcluding: boolean;
@@ -149,9 +131,9 @@ function CollapsibleInstruction({
     return (
       <div className="bg-amber-50 dark:bg-amber-900/10 rounded-lg border border-amber-100 dark:border-amber-800/30 p-3">
         <div className="flex items-start justify-between gap-3">
-          <p className="text-sm text-gray-700 dark:text-gray-300 break-words" style={{ overflowWrap: "anywhere" }}>
-            {fullText}
-          </p>
+          <div className="min-w-0 flex-1">
+            <SapInstructionBody html={html} text={fullText} />
+          </div>
           {excludeButton}
         </div>
       </div>
@@ -185,9 +167,7 @@ function CollapsibleInstruction({
       </div>
       {expanded && (
         <div className="px-3 pb-3 pt-0">
-          <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-line break-words" style={{ overflowWrap: "anywhere" }}>
-            {fullText}
-          </p>
+          <SapInstructionBody html={html} text={fullText} />
         </div>
       )}
     </div>

@@ -10,6 +10,7 @@ import { FileText, ClipboardList, ChevronDown, ChevronRight, Ban } from "lucide-
 import { useState } from "react";
 import { useInstructionExclusions } from "@/hooks/settings/useInstructionExclusions";
 import { filterSapInstructions } from "@/lib/sap/instruction-exclusions";
+import { SapInstructionBody } from "@/components/project/SapInstructionBody";
 import { useRoleAccess } from "@/hooks/user/useRoleAccess";
 import { useProjectInstructions } from "@/hooks/project/useProjectInstructions";
 
@@ -87,6 +88,7 @@ export function InstructionsDrawer({
                       key={i}
                       short={entry.short}
                       long={entry.long}
+                      html={entry.html}
                       slsLang={entry.slsLang}
                       canExclude={canExcludeSapInstructions}
                       isExcluding={isAdding}
@@ -134,12 +136,14 @@ export function InstructionsDrawer({
 function CollapsibleSapInstruction({
   short,
   long,
+  html,
   canExclude,
   isExcluding,
   onExclude,
 }: {
   short: string;
   long: string;
+  html?: string;
   slsLang?: string;
   canExclude: boolean;
   isExcluding: boolean;
@@ -167,9 +171,9 @@ function CollapsibleSapInstruction({
     return (
       <div className="bg-amber-50 dark:bg-amber-900/10 rounded-lg border border-amber-100 dark:border-amber-800/30 p-3">
         <div className="flex items-start justify-between gap-3">
-          <p className="text-sm text-gray-700 dark:text-gray-300 break-words" style={{ overflowWrap: "anywhere" }}>
-            {fullText}
-          </p>
+          <div className="min-w-0 flex-1">
+            <SapInstructionBody html={html} text={fullText} />
+          </div>
           {excludeButton}
         </div>
       </div>
@@ -203,9 +207,7 @@ function CollapsibleSapInstruction({
       </div>
       {expanded && (
         <div className="px-3 pb-3 pt-0">
-          <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-line break-words" style={{ overflowWrap: "anywhere" }}>
-            {fullText}
-          </p>
+          <SapInstructionBody html={html} text={fullText} />
         </div>
       )}
     </div>

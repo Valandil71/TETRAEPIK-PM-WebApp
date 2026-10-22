@@ -44,6 +44,7 @@ import { RoleGuard } from "@/components/auth/RoleGuard";
 import { RouteId } from "@/lib/roleAccess";
 import { useRoleAccess } from "@/hooks/user/useRoleAccess";
 import { notifyProjectsCompleted } from "@/lib/notifications/notify";
+import { nextManualFields } from "@/lib/projects/manualFields";
 import {
   addCollaborators,
   invalidateCollaboratorQueries,
@@ -497,6 +498,8 @@ function EditProjectContent() {
         lxe_projects: parseArrayField(values.lxe_projects),
         updated_at: new Date().toISOString(),
       };
+      // Fields edited here are no longer overwritten by the SAP import.
+      if (project) updateData.manual_fields = nextManualFields(project, updateData);
 
       const { error } = await supabase
         .from("projects")

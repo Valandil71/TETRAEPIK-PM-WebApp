@@ -178,22 +178,23 @@ export async function migrateLegacyDeadlineSplits(params: {
     // 2. Decide who owns the translators and the INITIAL status.
     //    Not active (already complete/cancelled): INITIAL inherits that status, translators stay.
     //    Initial deadline passed: INITIAL is complete, translators stay with FINAL.
-    //    Otherwise: translators move to INITIAL.
+    //    Otherwise: INITIAL stays active and translators move to it.
+    //    INITIAL is half of an existing project, so it never waits in "To Review" like new imports.
     const initialStatus =
       legacy.status !== 'active' ? legacy.status
       : hasPassed(initialData.initial_deadline, now) ? 'complete'
-      : null;
+      : 'active';
 
-    if (initialStatus) {
-      const { error } = await supabase
-        .from('projects')
-        .update({ status: initialStatus })
-        .eq('id', initialId);
-      if (error) {
-        fail('update', `could not set INITIAL project #${initialId} to ${initialStatus}: ${error.message}`);
-        continue;
-      }
-    } else {
+    const { error: statusError } = await supabase
+      .from('projects')
+      .update({ status: initialStatus })
+      .eq('id', initialId);
+    if (statusError) {
+      fail('update', `could not set INITIAL project #${initialId} to ${initialStatus}: ${statusError.message}`);
+      continue;
+    }
+
+    if (initialStatus === 'active') {
       const { error } = await supabase
         .from('projects_assignment')
         .update({ project_id: initialId })

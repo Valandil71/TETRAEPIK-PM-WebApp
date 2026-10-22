@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useSupabase } from '@/hooks/core/useSupabase';
 import type { Project } from '@/types/project';
 import { queryKeys } from "@/lib/queryKeys";
+import { attachSapInstructionHtml } from '@/lib/sap/instructions';
 
 export type ProjectInstructions = Pick<Project, "instructions" | "sap_instructions">;
 
@@ -16,7 +17,7 @@ export function useProjectInstructions(projectId: number | null) {
     queryFn: async (): Promise<ProjectInstructions> => {
       const { data, error } = await supabase
         .from('projects')
-        .select('instructions, sap_instructions')
+        .select('instructions, sap_instructions, sap_instructions_html')
         .eq('id', projectId)
         .single();
 
@@ -24,7 +25,11 @@ export function useProjectInstructions(projectId: number | null) {
         throw new Error(`Failed to fetch project instructions: ${error.message}`);
       }
 
-      return data as ProjectInstructions;
+      const row = data as ProjectInstructions & Pick<Project, "sap_instructions_html">;
+      return {
+        instructions: row.instructions,
+        sap_instructions: attachSapInstructionHtml(row.sap_instructions, row.sap_instructions_html),
+      };
     },
     enabled: projectId !== null,
   });

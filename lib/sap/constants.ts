@@ -22,3 +22,19 @@ export const TRACKED_FIELDS = [
   'project_type',
 ] as const;
 
+
+/**
+ * SAP-owned fields a PM can edit in "Edit project". Once edited they are listed in
+ * projects.manual_fields and the SAP import stops overwriting them.
+ */
+export const MANUALLY_EDITABLE_SAP_FIELDS = [
+  'instructions',
+  'terminology_key',
+  'translation_area',
+  'work_list',
+  'graph_id',
+  'lxe_project',
+  'lxe_projects',
+] as const;
+
+export type ManuallyEditableSapField = (typeof MANUALLY_EDITABLE_SAP_FIELDS)[number];

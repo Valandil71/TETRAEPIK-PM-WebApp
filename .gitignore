@@ -31,3 +31,5 @@ npm-debug.log*
 docs/
 
 
+# personal design-system export (not for git)
+design-system/

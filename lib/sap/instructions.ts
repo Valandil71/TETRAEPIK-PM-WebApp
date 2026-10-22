@@ -67,15 +67,47 @@ export function buildSapInstructions(
     if (seen.has(normalizedForMatch)) continue;
     seen.add(normalizedForMatch);
 
+    const html = instr.instructionLong?.trim();
     entries.push({
       instructionShort: strippedShort,
       instructionLong: strippedLong,
+      instructionLongHtml: html && /<[a-z][^>]*>/i.test(html) ? html : undefined,
       slsLang: instr.slsLang || undefined,
       contentId: instr.contentId || undefined,
     });
   }
 
   return entries.length > 0 ? entries : null;
+}
+
+/**
+ * Splits the HTML bodies off the entries: sap_instructions keeps the plain-text entries that
+ * lists load, sap_instructions_html holds the HTML (same order) for the detail views only.
+ */
+export function splitSapInstructionHtml(entries: SapInstructionEntry[] | null): {
+  sap_instructions: SapInstructionEntry[] | null;
+  sap_instructions_html: (string | null)[] | null;
+} {
+  if (!entries) return { sap_instructions: null, sap_instructions_html: null };
+  return {
+    sap_instructions: entries.map(({ instructionLongHtml, ...entry }) => {
+      void instructionLongHtml;
+      return entry;
+    }),
+    sap_instructions_html: entries.some((entry) => entry.instructionLongHtml)
+      ? entries.map((entry) => entry.instructionLongHtml ?? null)
+      : null,
+  };
+}
+
+/** Puts the HTML bodies from sap_instructions_html back on their entries, for display. */
+export function attachSapInstructionHtml(
+  entries: SapInstructionEntry[] | null | undefined,
+  html: (string | null)[] | null | undefined
+): SapInstructionEntry[] | null {
+  if (!entries) return null;
+  if (!html || html.length !== entries.length) return entries;
+  return entries.map((entry, i) => (html[i] ? { ...entry, instructionLongHtml: html[i] } : entry));
 }
 
 /**

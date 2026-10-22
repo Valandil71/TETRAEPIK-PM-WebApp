@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { buildSapUpdatePayload, findExistingProject, insertProjectFromSap } from '@/lib/sap/project-writer';
+import {
+  buildSapUpdatePayload,
+  findExistingProject,
+  insertProjectFromSap,
+  omitManualFields,
+  updateProjectFromSap,
+} from '@/lib/sap/project-writer';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { SapProjectForImport } from '@/types/sap';
 
@@ -156,16 +162,54 @@ describe('insertProjectFromSap status', () => {
     return { supabase, inserted };
   }
 
-  it('inserts projects with a volume as active', async () => {
+  it('inserts every new project as pending_review, with or without a volume', async () => {
     const { supabase, inserted } = captureInsert();
     await insertProjectFromSap(supabase, baseData);
-    expect(inserted[0].status).toBe('active');
-  });
-
-  it('inserts projects without lines/words (XTM words = presence flag) as pending_review', async () => {
-    const { supabase, inserted } = captureInsert();
     await insertProjectFromSap(supabase, { ...baseData, system: 'XTM', words: 1, lines: null });
     await insertProjectFromSap(supabase, { ...baseData, system: 'SSE', words: null, lines: null, hours: 2 });
-    expect(inserted.map((row) => row.status)).toEqual(['pending_review', 'pending_review']);
+    expect(inserted.map((row) => row.status)).toEqual(['pending_review', 'pending_review', 'pending_review']);
+  });
+});
+
+describe('manual fields', () => {
+  it('omitManualFields drops only the listed fields', () => {
+    const payload = omitManualFields(
+      buildSapUpdatePayload({ ...baseData, instructions: 'TK: 000614', work_list: ['0001'] }),
+      new Set(['instructions'])
+    );
+    expect('instructions' in payload).toBe(false);
+    expect(payload.work_list).toEqual(['0001']);
+  });
+
+  it('updateProjectFromSap keeps fields a PM edited by hand and leaves them out of the report', async () => {
+    const updates: Record<string, unknown>[] = [];
+    const current = {
+      ...baseData,
+      instructions: 'WL: 0001, partner system',
+      work_list: ['0001'],
+      manual_fields: ['instructions', 'work_list'],
+    };
+    const supabase = {
+      from: () => ({
+        select: () => ({ eq: () => ({ single: async () => ({ data: current, error: null }) }) }),
+        update: (row: Record<string, unknown>) => {
+          updates.push(row);
+          return { eq: async () => ({ error: null }) };
+        },
+      }),
+    } as unknown as SupabaseClient;
+
+    const result = await updateProjectFromSap(
+      supabase,
+      7,
+      { ...baseData, instructions: 'TK: 000614', work_list: ['0002'], name: 'Renamed' }
+    );
+
+    expect(result.error).toBeNull();
+    expect('instructions' in updates[0]).toBe(false);
+    expect('work_list' in updates[0]).toBe(false);
+    expect(updates[0].name).toBe('Renamed');
+    expect(result.changes.instructions).toBeUndefined();
+    expect(result.changes.name).toEqual({ old: 'Project', new: 'Renamed' });
   });
 });

@@ -2,8 +2,8 @@
 import type { ApiSource } from './sap';
 
 /**
- * "pending_review": imported from SAP without lines/words; a PM must review it before it is
- * assigned (Manage Projects → To Review), which moves it to "active".
+ * "pending_review": newly imported from SAP; a PM must review it before it is assigned
+ * (Manage Projects → To Review), which moves it to "active".
  */
 export type ProjectStatus = "complete" | "active" | "cancelled" | "pending_review";
 
@@ -35,6 +35,8 @@ export interface Project {
   api_source?: ApiSource;
   last_synced_at?: string | null;
   sap_instructions?: SapInstructionEntry[] | null;
+  /** HTML body of each sap_instructions entry (same order), or null where SAP sent none. */
+  sap_instructions_html?: (string | null)[] | null;
   sap_pm?: string | null;
 
   // New fields
@@ -48,14 +50,21 @@ export interface Project {
   url?: string | null;
   hours?: number | null;
   project_notes?: string | null;
+  /** SAP-owned fields a PM edited by hand; the SAP import leaves them as they are. */
+  manual_fields?: string[] | null;
 }
 
 /** SAP instruction entry stored in sap_instructions JSONB column */
 export interface SapInstructionEntry {
   /** Title/summary from SAP */
   instructionShort: string;
-  /** Full body from SAP */
+  /** Full body from SAP, as plain text (used for display fallback, dedupe and exclusions) */
   instructionLong: string;
+  /**
+   * Full body as the HTML SAP sends. Only set while importing; it is stored in the separate
+   * sap_instructions_html column (lists never load it) and attached back for display.
+   */
+  instructionLongHtml?: string;
   slsLang?: string;
   contentId?: string;
   /** @deprecated Use instructionLong or instructionShort. Kept for backward compat with existing DB data. */

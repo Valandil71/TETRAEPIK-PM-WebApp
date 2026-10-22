@@ -5,7 +5,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { SapProjectForImport } from '@/types/sap';
 import { TRACKED_FIELDS } from './constants';
 import { collectTrackedChanges, type ReportChanges } from './sync-utils';
-import { initialImportStatus } from '@/lib/projects/reviewStatus';
+import { splitSapInstructionHtml } from './instructions';
 import {
   appendDeadlineVariantToImportKey,
   getDeadlineVariantFromImportKey,
@@ -40,6 +40,7 @@ interface SapUpdatePayload {
   last_synced_at: SapProjectForImport['last_synced_at'];
   // Conditionally included; absent (not undefined) when their option is false.
   sap_instructions?: SapProjectForImport['sap_instructions'];
+  sap_instructions_html?: (string | null)[] | null;
   words?: SapProjectForImport['words'];
   lines?: SapProjectForImport['lines'];
 }
@@ -74,7 +75,7 @@ export function buildSapUpdatePayload(
   };
 
   if (includeSapInstructions) {
-    payload.sap_instructions = data.sap_instructions;
+    Object.assign(payload, splitSapInstructionHtml(data.sap_instructions));
   }
 
   if (includeVolumes) {
@@ -83,6 +84,16 @@ export function buildSapUpdatePayload(
   }
 
   return payload;
+}
+
+/** Drops the fields a PM edited by hand (projects.manual_fields), so the import keeps their value. */
+export function omitManualFields(
+  payload: SapUpdatePayload,
+  manualFields: ReadonlySet<string>
+): Partial<SapUpdatePayload> {
+  return Object.fromEntries(
+    Object.entries(payload).filter(([field]) => !manualFields.has(field))
+  ) as Partial<SapUpdatePayload>;
 }
 
 /**
@@ -227,24 +238,27 @@ export async function updateProjectFromSap(
   // Fetch current values for change tracking
   const { data: currentProject } = await supabase
     .from('projects')
-    .select('name, language_in, language_out, initial_deadline, final_deadline, system, instructions, words, lines, hours, sap_pm, project_type')
+    .select('name, language_in, language_out, initial_deadline, final_deadline, system, instructions, words, lines, hours, sap_pm, project_type, manual_fields')
     .eq('id', existingId)
     .single();
 
+  const manualFields = new Set<string>(currentProject?.manual_fields ?? []);
   const trackedFields = TRACKED_FIELDS.filter(
-    (field) => field !== 'words' && field !== 'lines'
+    (field) => field !== 'words' && field !== 'lines' && !manualFields.has(field)
   );
 
   const changes = currentProject
     ? collectTrackedChanges(currentProject, data, trackedFields)
     : {};
 
+  const payload = buildSapUpdatePayload(data, {
+    includeVolumes: false,
+    includeSapInstructions: options.includeSapInstructions,
+  });
+
   const { error: updateError } = await supabase
     .from('projects')
-    .update(buildSapUpdatePayload(data, {
-      includeVolumes: false,
-      includeSapInstructions: options.includeSapInstructions,
-    }))
+    .update(omitManualFields(payload, manualFields))
     .eq('id', existingId);
 
   if (updateError) {
@@ -265,8 +279,8 @@ export async function insertProjectFromSap(
       ...buildSapUpdatePayload(data),
       sap_subproject_id: data.sap_subproject_id,
       api_source: data.api_source,
-      // Projects without lines/words wait in "To Review" until a PM sets the volume.
-      status: initialImportStatus(data),
+      // Every new SAP project waits in "To Review" until a PM confirms it in SOL.
+      status: 'pending_review',
     })
     .select('id')
     .single();

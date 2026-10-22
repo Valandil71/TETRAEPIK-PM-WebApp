@@ -175,8 +175,13 @@ export interface SapProjectForImport {
 export interface SapInstructionEntry {
   /** Title/summary from SAP */
   instructionShort: string;
-  /** Full body from SAP */
+  /** Full body from SAP, as plain text (used for display fallback, dedupe and exclusions) */
   instructionLong: string;
+  /**
+   * Full body as the HTML SAP sends. Only set while importing; it is stored in the separate
+   * sap_instructions_html column (lists never load it) and attached back for display.
+   */
+  instructionLongHtml?: string;
   slsLang?: string;
   contentId?: string;
   /** @deprecated Use instructionLong or instructionShort. Kept for backward compat with existing DB data. */
