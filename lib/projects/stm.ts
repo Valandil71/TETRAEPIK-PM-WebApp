@@ -1,15 +1,25 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { toStmImportKey } from "@/lib/sap/import-keys";
+import { createDuplicateImportKey, toStmImportKey } from "@/lib/sap/import-keys";
+
+const UNIQUE_VIOLATION = "23505";
+
+/** A copy that can't be made, with a message written for the PM. */
+export class ProjectCopyError extends Error {
+  constructor(
+    message: string,
+    /** The project that already holds the copy, when there is one to open. */
+    readonly existingProjectId: number | null = null
+  ) {
+    super(message);
+    this.name = "ProjectCopyError";
+  }
+}
 
 /**
- * Create an STM copy of a project. The source is read from the database (not from a cached
- * query) so the copy always reflects the current row; identity and timestamps are left to
- * the database.
+ * Read the source from the database (not from a cached query) so the copy always reflects the
+ * current row; identity and timestamps are left to the database.
  */
-export async function createStmProject(
-  supabase: SupabaseClient,
-  sourceProjectId: number
-): Promise<{ id: number }> {
+async function loadCopySource(supabase: SupabaseClient, sourceProjectId: number) {
   const { data: sourceProject, error: sourceError } = await supabase
     .from("projects")
     .select("*")
@@ -29,19 +39,74 @@ export async function createStmProject(
   void updated_at;
   void closest_deadline;
 
+  return projectData;
+}
+
+/** Create an STM copy of a project. Each project has at most one STM copy. */
+export async function createStmProject(
+  supabase: SupabaseClient,
+  sourceProjectId: number
+): Promise<{ id: number }> {
+  const projectData = await loadCopySource(supabase, sourceProjectId);
+
+  if (projectData.system === "STM") {
+    throw new ProjectCopyError(
+      "This project is already an STM project. To make another copy, choose “Duplicate project”."
+    );
+  }
+
+  const sapImportKey = toStmImportKey(projectData.sap_import_key);
   const { data: newProject, error: createError } = await supabase
     .from("projects")
-    .insert({
-      ...projectData,
-      system: "STM",
-      sap_import_key: toStmImportKey(projectData.sap_import_key),
-    })
+    .insert({ ...projectData, system: "STM", sap_import_key: sapImportKey })
+    .select("id")
+    .single();
+
+  // The STM key is derived from the source's key, so a second STM copy collides with the first
+  if (createError?.code === UNIQUE_VIOLATION && sapImportKey) {
+    const { data: existing } = await supabase
+      .from("projects")
+      .select("id")
+      .eq("sap_subproject_id", projectData.sap_subproject_id)
+      .eq("sap_import_key", sapImportKey)
+      .maybeSingle();
+
+    throw new ProjectCopyError(
+      "This project already has an STM project. To make another copy, choose “Duplicate project”.",
+      existing?.id ?? null
+    );
+  }
+
+  if (createError || !newProject) {
+    throw new Error(
+      `Failed to create STM project: ${createError?.message || "Unknown error"}`
+    );
+  }
+
+  return newProject;
+}
+
+/**
+ * Create a copy of a project with the PM's changes (system, work list, volumes…) applied;
+ * every other field is copied as it is. The copy gets its own import key, so the SAP import
+ * never updates or matches it.
+ */
+export async function duplicateProject(
+  supabase: SupabaseClient,
+  sourceProjectId: number,
+  changes: Record<string, unknown> = {}
+): Promise<{ id: number }> {
+  const projectData = await loadCopySource(supabase, sourceProjectId);
+
+  const { data: newProject, error: createError } = await supabase
+    .from("projects")
+    .insert({ ...projectData, ...changes, sap_import_key: createDuplicateImportKey() })
     .select("id")
     .single();
 
   if (createError || !newProject) {
     throw new Error(
-      `Failed to create STM project: ${createError?.message || "Unknown error"}`
+      `Failed to duplicate project: ${createError?.message || "Unknown error"}`
     );
   }
 

@@ -117,9 +117,7 @@ interface ManagementCardProps {
   onAddTranslator: (projectId: number) => void;
   onSelfAssign: (projectId: number) => void;
   onRemoveTranslator: (projectId: number) => void;
-  onCreateStmProject: (projectId: number) => void;
-  creatingStmProjectId: number | null;
-  isCreatingStmProject: boolean;
+  onDuplicateProject: (projectId: number) => void;
   onEditDetails: (projectId: number) => void;
   onCompleteProject: (projectId: number) => void;
   onSelectMultiple: (projectId: number) => void;
@@ -151,9 +149,7 @@ export function ManagementCard({
   onAddTranslator,
   onSelfAssign,
   onRemoveTranslator,
-  onCreateStmProject,
-  creatingStmProjectId,
-  isCreatingStmProject,
+  onDuplicateProject,
   onEditDetails,
   onCompleteProject,
   onSelectMultiple,
@@ -278,10 +274,7 @@ export function ManagementCard({
           onAddTranslator={() => onAddTranslator(project.id)}
           onSelfAssign={() => onSelfAssign(project.id)}
           onRemoveTranslator={() => onRemoveTranslator(project.id)}
-          onCreateStmProject={() => onCreateStmProject(project.id)}
-          isCreatingStmProject={
-            isCreatingStmProject && creatingStmProjectId === project.id
-          }
+          onDuplicateProject={() => onDuplicateProject(project.id)}
           onEditDetails={() => onEditDetails(project.id)}
           onCompleteProject={() => onCompleteProject(project.id)}
           onSelectMultiple={() => onSelectMultiple(project.id)}

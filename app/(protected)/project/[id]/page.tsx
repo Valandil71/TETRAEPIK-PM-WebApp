@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Edit, Loader2, Check, X, FilePlus, Info } from "lucide-react";
+import { ArrowLeft, Edit, Loader2, Check, X, Copy, Info } from "lucide-react";
 import { formatProjectName } from "@/utils/formatters";
 import { useEffect, useRef, useState } from "react";
 import { useProject } from "@/hooks/project/useProject";
@@ -32,7 +32,7 @@ import {
   invalidateCollaboratorQueries,
   removeCollaborator,
 } from "@/lib/projects/collaborators";
-import { createStmProject } from "@/lib/projects/stm";
+import { DuplicateProjectDialog } from "@/components/management/DuplicateProjectDialog";
 import { notifyAssigned, notifyProjectsCompleted } from "@/lib/notifications/notify";
 
 export default function ProjectPage() {
@@ -89,6 +89,7 @@ export default function ProjectPage() {
   }>({ open: false, projectId: null, projectName: "", message: "" });
 
   const [showCompleteConfirm, setShowCompleteConfirm] = useState(false);
+  const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
 
   const hasRedirected = useRef(false);
 
@@ -285,26 +286,6 @@ export default function ProjectPage() {
   // PM/Admin handlers
   const handleEdit = () => {
     router.push(`/project/${projectId}/edit`);
-  };
-
-  const createStmProjectMutation = useMutation({
-    mutationFn: async () => {
-      if (!projectId) throw new Error("Project ID is required");
-      return createStmProject(supabase, projectId);
-    },
-    onSuccess: (newProject) => {
-      queryClient.invalidateQueries({ queryKey: ["projects-with-translators"] });
-      queryClient.invalidateQueries({ queryKey: ["projects"] });
-      toast.success("STM project created successfully. Opening it now.");
-      router.push(`/project/${newProject.id}`);
-    },
-    onError: (error: Error) => {
-      toast.error(getUserFriendlyError(error, "project creation"));
-    },
-  });
-
-  const handleCreateStmProject = () => {
-    createStmProjectMutation.mutate();
   };
 
   const handleAddTranslator = () => {
@@ -533,21 +514,17 @@ export default function ProjectPage() {
 
           {/* Action buttons based on role */}
           <div className="flex gap-2">
-            {/* PM/Admin: Create STM and Edit buttons */}
+            {/* PM/Admin: Duplicate and Edit buttons */}
             {canManageAssignments() && (
               <>
                 <Button
-                  onClick={handleCreateStmProject}
+                  onClick={() => setShowDuplicateDialog(true)}
                   size="sm"
                   variant="outline"
-                  disabled={createStmProjectMutation.isPending}
                   className="cursor-pointer"
                 >
-                  {createStmProjectMutation.isPending ?
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  : <FilePlus className="w-4 h-4 mr-2" />
-                  }
-                  {createStmProjectMutation.isPending ? "Creating STM..." : "Create STM Project"}
+                  <Copy className="w-4 h-4 mr-2" />
+                  Duplicate Project
                 </Button>
                 <Button
                   onClick={handleEdit}
@@ -731,6 +708,11 @@ export default function ProjectPage() {
             onConfirm={() => markCompleteMutation.mutate()}
             onCancel={() => {}}
             isLoading={markCompleteMutation.isPending}
+          />
+
+          <DuplicateProjectDialog
+            project={showDuplicateDialog && project ? { id: project.id, name: project.name } : null}
+            onClose={() => setShowDuplicateDialog(false)}
           />
         </>
       )}

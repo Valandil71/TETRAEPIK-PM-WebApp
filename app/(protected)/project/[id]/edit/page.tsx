@@ -1,9 +1,11 @@
 "use client";
 
-import React, { useState, useRef, useCallback, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Save, Loader2, Users, UserPlus, X } from "lucide-react";
+import React, { useState, useRef, useCallback, useEffect, Suspense } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { ArrowLeft, Save, Loader2, Users, UserPlus, X, Copy } from "lucide-react";
 import { useProject } from "@/hooks/project/useProject";
+import { useProjectSystems } from "@/hooks/project/useProjectSystems";
+import { SystemCombobox } from "@/components/shared/SystemCombobox";
 import { AddTranslatorDialog } from "@/components/management/AddTranslatorDialog";
 import { EditConflictModal, FieldConflict } from "@/components/ui/EditConflictModal";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
@@ -45,6 +47,7 @@ import { RouteId } from "@/lib/roleAccess";
 import { useRoleAccess } from "@/hooks/user/useRoleAccess";
 import { notifyProjectsCompleted } from "@/lib/notifications/notify";
 import { nextManualFields } from "@/lib/projects/manualFields";
+import { duplicateProject } from "@/lib/projects/stm";
 import {
   addCollaborators,
   invalidateCollaboratorQueries,
@@ -79,9 +82,6 @@ const projectSchema = z.object({
 });
 
 type ProjectFormValues = z.infer<typeof projectSchema>;
-
-// Common systems - can be extended
-const BASE_SYSTEMS = ["B0X", "XTM", "SSE", "STM", "LAT"];
 
 /** Human-readable labels for project fields */
 const FIELD_LABELS: Record<string, string> = {
@@ -143,7 +143,10 @@ const MONITORED_FIELDS = [
 export default function EditProjectPage() {
   return (
     <RoleGuard routeId={RouteId.PROJECT_EDIT}>
-      <EditProjectContent />
+      {/* useSearchParams needs a Suspense boundary */}
+      <Suspense>
+        <EditProjectContent />
+      </Suspense>
     </RoleGuard>
   );
 }
@@ -153,8 +156,11 @@ function EditProjectContent() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const projectId = params.id ? Number(params.id) : null;
+  // ?duplicate=1: the form starts from this project and saving creates a copy of it
+  const isDuplicate = useSearchParams().get("duplicate") === "1";
 
   const { data: project, isLoading, error } = useProject(projectId);
+  const { systems } = useProjectSystems(project?.system);
   const { user } = useRoleAccess();
   const collapsed = useLayoutStore((state) => state.collapsed);
   const resetManagementToStart = useManagementPageStore((state) => state.resetToStart);
@@ -196,12 +202,6 @@ function EditProjectContent() {
     });
     return { previousOwnTranslatorChanges: previous };
   };
-
-  // Include project's current system in the list if it's not already there
-  const SYSTEMS =
-    project?.system && !BASE_SYSTEMS.includes(project.system) ?
-      [project.system, ...BASE_SYSTEMS]
-    : BASE_SYSTEMS;
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey =
@@ -276,12 +276,16 @@ function EditProjectContent() {
     },
   });
 
+  const hasFilledDuplicateForm = useRef(false);
   React.useEffect(() => {
     if (formValues && project) {
+      // A duplicate starts from the original once; later changes to the original don't touch it
+      if (isDuplicate && hasFilledDuplicateForm.current) return;
+      hasFilledDuplicateForm.current = true;
       // Reset with loaded data so fields show current values and form is clean
       form.reset(formValues);
     }
-  }, [form, formValues, project]);
+  }, [form, formValues, project, isDuplicate]);
 
   // Store the original project data when first loaded
   useEffect(() => {
@@ -345,7 +349,8 @@ function EditProjectContent() {
 
   // Check for conflicts when project updates
   useEffect(() => {
-    if (!hasStoredOriginal.current || !originalProject || !project) return;
+    // A duplicate is a new project: changes to the original are not a conflict
+    if (isDuplicate || !hasStoredOriginal.current || !originalProject || !project) return;
 
     const detectedConflicts = detectConflicts();
     if (detectedConflicts.length > 0 && !showConflictModal) {
@@ -355,7 +360,7 @@ function EditProjectContent() {
       }, 0);
       return () => clearTimeout(timeout);
     }
-  }, [project, detectConflicts, originalProject, showConflictModal]);
+  }, [project, detectConflicts, originalProject, showConflictModal, isDuplicate]);
 
   // Handle "Continue Editing" - merge changes
   const handleContinueEditing = useCallback(() => {
@@ -461,41 +466,48 @@ function EditProjectContent() {
     router.back();
   }, [router]);
 
+  /** The project columns written from the form values. */
+  const buildProjectChanges = (values: ProjectFormValues): Record<string, unknown> => {
+    const parseArrayField = (val: string | null | undefined): string[] | null => {
+      if (!val || val.trim() === "") return null;
+      return val.split(",").map((s) => s.trim()).filter(Boolean);
+    };
+
+    return {
+      name: values.name,
+      system: values.system,
+      status: values.status,
+      words: values.words ?? null,
+      lines: values.lines ?? null,
+      language_in: values.language_in || null,
+      language_out: values.language_out || null,
+      // Keep the stored time of day: the form only edits the date part.
+      initial_deadline: dateInputToTimestamp(values.initial_deadline, project?.initial_deadline),
+      interim_deadline: dateInputToTimestamp(values.interim_deadline, project?.interim_deadline),
+      final_deadline: dateInputToTimestamp(values.final_deadline, project?.final_deadline),
+      instructions: values.instructions || null,
+      paid: values.paid ?? false,
+      invoiced: values.invoiced ?? false,
+      project_type: values.project_type || null,
+      sap_pm: values.sap_pm || null,
+      hours: values.hours ?? null,
+      url: values.url || null,
+      project_notes: values.project_notes || null,
+      terminology_key: parseArrayField(values.terminology_key),
+      translation_area: parseArrayField(values.translation_area),
+      work_list: parseArrayField(values.work_list),
+      graph_id: parseArrayField(values.graph_id),
+      lxe_project: parseArrayField(values.lxe_project),
+      lxe_projects: parseArrayField(values.lxe_projects),
+    };
+  };
+
   const updateProjectMutation = useMutation({
     mutationFn: async (values: ProjectFormValues) => {
       if (!projectId) throw new Error("Project ID is required");
 
-      const parseArrayField = (val: string | null | undefined): string[] | null => {
-        if (!val || val.trim() === "") return null;
-        return val.split(",").map((s) => s.trim()).filter(Boolean);
-      };
-
       const updateData: Record<string, unknown> = {
-        name: values.name,
-        system: values.system,
-        status: values.status,
-        words: values.words ?? null,
-        lines: values.lines ?? null,
-        language_in: values.language_in || null,
-        language_out: values.language_out || null,
-        // Keep the stored time of day: the form only edits the date part.
-        initial_deadline: dateInputToTimestamp(values.initial_deadline, project?.initial_deadline),
-        interim_deadline: dateInputToTimestamp(values.interim_deadline, project?.interim_deadline),
-        final_deadline: dateInputToTimestamp(values.final_deadline, project?.final_deadline),
-        instructions: values.instructions || null,
-        paid: values.paid ?? false,
-        invoiced: values.invoiced ?? false,
-        project_type: values.project_type || null,
-        sap_pm: values.sap_pm || null,
-        hours: values.hours ?? null,
-        url: values.url || null,
-        project_notes: values.project_notes || null,
-        terminology_key: parseArrayField(values.terminology_key),
-        translation_area: parseArrayField(values.translation_area),
-        work_list: parseArrayField(values.work_list),
-        graph_id: parseArrayField(values.graph_id),
-        lxe_project: parseArrayField(values.lxe_project),
-        lxe_projects: parseArrayField(values.lxe_projects),
+        ...buildProjectChanges(values),
         updated_at: new Date().toISOString(),
       };
       // Fields edited here are no longer overwritten by the SAP import.
@@ -529,6 +541,26 @@ function EditProjectContent() {
       toast.error(getUserFriendlyError(error, "project update"));
     },
   });
+
+  // Duplicate mode: the copy is only created here, when the PM saves the form
+  const duplicateProjectMutation = useMutation({
+    mutationFn: (values: ProjectFormValues) => {
+      if (!projectId) throw new Error("Project ID is required");
+      return duplicateProject(supabase, projectId, buildProjectChanges(values));
+    },
+    onSuccess: (newProject) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.projects() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.projectsWithTranslators() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.homeManageProjectsCount() });
+      toast.success("Project duplicated. Opening it now.");
+      // Replace, so going back does not return to the duplicate form
+      router.replace(`/project/${newProject.id}`);
+    },
+    onError: (error: Error) => {
+      toast.error(getUserFriendlyError(error, "project creation"));
+    },
+  });
+  const isSaving = updateProjectMutation.isPending || duplicateProjectMutation.isPending;
 
   // Add translators mutation
   const addTranslatorsMutation = useMutation({
@@ -630,11 +662,14 @@ function EditProjectContent() {
   };
 
   const onSubmit = (values: ProjectFormValues) => {
-    updateProjectMutation.mutate(values);
+    if (isDuplicate) duplicateProjectMutation.mutate(values);
+    else updateProjectMutation.mutate(values);
   };
 
   // Check if form is dirty (has changes)
   const isDirty = form.formState.isDirty;
+  // A duplicate can be created unchanged, so its save bar is always shown
+  const showSaveBar = isDirty || isDuplicate;
 
   if (isLoading) {
     return (
@@ -673,10 +708,12 @@ function EditProjectContent() {
         </Button>
 
         <h1 className="text-gray-900 dark:text-white mb-2 text-3xl font-bold">
-          Edit Project
+          {isDuplicate ? "Duplicate Project" : "Edit Project"}
         </h1>
         <p className="text-gray-500 dark:text-gray-400">
-          Update project details and settings
+          {isDuplicate ?
+            "Change what is different in the copy. It is only created when you click “Create duplicate”."
+          : "Update project details and settings"}
         </p>
       </div>
 
@@ -711,28 +748,14 @@ function EditProjectContent() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>System</FormLabel>
-                      <Select
-                        onValueChange={(val) => {
-                          // Guard: Only update if val is not empty (prevents Radix clearing the value)
-                          if (val) {
-                            field.onChange(val);
-                          }
-                        }}
-                        value={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select a system" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {SYSTEMS.map((system) => (
-                            <SelectItem key={system} value={system}>
-                              {system}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <FormControl>
+                        <SystemCombobox
+                          value={field.value}
+                          onChange={field.onChange}
+                          onBlur={field.onBlur}
+                          systems={systems}
+                        />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -1214,8 +1237,8 @@ function EditProjectContent() {
             </CardContent>
           </Card>
 
-          {/* Translators Management Card */}
-          <Card>
+          {/* Translators Management Card (a duplicate has no collaborators until it exists) */}
+          {!isDuplicate && <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -1312,15 +1335,15 @@ function EditProjectContent() {
                 </div>
               )}
             </CardContent>
-          </Card>
+          </Card>}
 
           {/* Spacer to prevent content from being hidden behind fixed button */}
-          {isDirty && <div className="h-24" />}
+          {showSaveBar && <div className="h-24" />}
         </form>
       </Form>
 
       {/* Fixed Bottom Bar for Unsaved Changes */}
-      {isDirty && (
+      {showSaveBar && (
         <div
           className={`fixed bottom-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 shadow-lg z-50 transition-all duration-300 ${
             collapsed ? "left-20" : "left-52"
@@ -1328,33 +1351,36 @@ function EditProjectContent() {
         >
           <div className="max-w-5xl mx-auto px-8 py-4 flex items-center justify-between">
             <div className="text-gray-900 dark:text-white">
-              You have unsaved changes
+              {isDuplicate ? "The duplicate is not created yet" : "You have unsaved changes"}
             </div>
             <div className="flex items-center gap-3">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => {
-                  form.reset();
+                  if (isDuplicate) router.back();
+                  else form.reset();
                 }}
-                disabled={updateProjectMutation.isPending}
+                disabled={isSaving}
               >
-                Discard
+                {isDuplicate ? "Cancel" : "Discard"}
               </Button>
               <Button
                 type="button"
                 onClick={form.handleSubmit(onSubmit)}
-                disabled={updateProjectMutation.isPending}
+                disabled={isSaving}
                 className="bg-blue-500 hover:bg-blue-600 text-white"
               >
-                {updateProjectMutation.isPending ?
+                {isSaving ?
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                     Saving...
                   </>
                 : <>
-                    <Save className="w-5 h-5 mr-2" />
-                    Save Changes
+                    {isDuplicate ?
+                      <Copy className="w-5 h-5 mr-2" />
+                    : <Save className="w-5 h-5 mr-2" />}
+                    {isDuplicate ? "Create duplicate" : "Save Changes"}
                   </>
                 }
               </Button>

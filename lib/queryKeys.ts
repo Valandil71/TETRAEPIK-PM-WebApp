@@ -27,6 +27,7 @@ export const queryKeys = {
   // Nested under project(id) so realtime project invalidations also refresh it.
   projectInstructions: (id: number | null) => ['project', id, 'instructions'] as const,
   projects: () => ['projects'] as const,
+  projectSystems: () => ['project-systems'] as const,
   // Called without arguments it returns the prefix, so invalidating it refreshes every list variant.
   // The 4th element is the list's project status; realtime invalidation relies on that position.
   projectsWithTranslators: (showPast?: boolean, showAll?: boolean, status?: ProjectListStatus) =>

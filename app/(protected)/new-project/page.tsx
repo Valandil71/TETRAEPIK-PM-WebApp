@@ -6,6 +6,8 @@ import { useState, useEffect, useMemo, Suspense } from "react";
 import { createBrowserClient } from "@supabase/ssr";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/queryKeys";
+import { useProjectSystems } from "@/hooks/project/useProjectSystems";
+import { SystemCombobox } from "@/components/shared/SystemCombobox";
 import { toast } from "sonner";
 import { RoleGuard } from "@/components/auth/RoleGuard";
 import { RouteId } from "@/lib/roleAccess";
@@ -99,6 +101,7 @@ function NewProjectPageContent() {
   }, [sourceProject]);
 
   const [formData, setFormData] = useState(initialFormData);
+  const { systems } = useProjectSystems(formData.system);
 
   // Update form data when source project loads
   useEffect(() => {
@@ -269,20 +272,13 @@ function NewProjectPageContent() {
             <label htmlFor="system-select" className="block text-gray-700 dark:text-gray-300 mb-2">
               System
             </label>
-            <select
+            <SystemCombobox
               id="system-select"
               value={formData.system}
-              onChange={(e) =>
-                setFormData({ ...formData, system: e.target.value })
-              }
-              className="w-full px-4 py-3 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="B0X">B0X</option>
-              <option value="XTM">XTM</option>
-              <option value="SSE">SSE</option>
-              <option value="STM">STM</option>
-              <option value="LAT">LAT</option>
-            </select>
+              onChange={(system) => setFormData({ ...formData, system })}
+              systems={systems}
+              className="h-auto px-4 py-3 text-base bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+            />
           </div>
 
           {/* Words and Lines */}

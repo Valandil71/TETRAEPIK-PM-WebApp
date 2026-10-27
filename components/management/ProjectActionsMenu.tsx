@@ -6,8 +6,7 @@ import {
   UserPlus,
   UserCheck,
   UserMinus,
-  FilePlus,
-  Loader2,
+  Copy,
   Edit,
   ListChecks,
   ClipboardCheck,
@@ -28,8 +27,8 @@ interface ProjectActionsMenuProps {
   onAddTranslator: () => void;
   onSelfAssign: () => void;
   onRemoveTranslator: () => void;
-  onCreateStmProject: () => void;
-  isCreatingStmProject?: boolean;
+  /** Opens the choice between an STM project and a plain duplicate. */
+  onDuplicateProject: () => void;
   onEditDetails: () => void;
   onCompleteProject: () => void;
   onSelectMultiple: () => void;
@@ -47,8 +46,7 @@ export function ProjectActionsMenu({
   onAddTranslator,
   onSelfAssign,
   onRemoveTranslator,
-  onCreateStmProject,
-  isCreatingStmProject = false,
+  onDuplicateProject,
   onEditDetails,
   onCompleteProject,
   onSelectMultiple,
@@ -142,17 +140,13 @@ export function ProjectActionsMenu({
         )}
         <DropdownMenuItem
           className="cursor-pointer px-4 py-2.5 text-gray-700 dark:text-gray-300 hover:bg-blue-100 dark:hover:bg-gray-700 focus:bg-blue-100 dark:focus:bg-gray-700"
-          disabled={isCreatingStmProject}
           onClick={(e) => {
             e.stopPropagation();
-            onCreateStmProject();
+            onDuplicateProject();
           }}
         >
-          {isCreatingStmProject ?
-            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-          : <FilePlus className="w-4 h-4 mr-2" />
-          }
-          {isCreatingStmProject ? "Creating STM..." : "Create STM Project"}
+          <Copy className="w-4 h-4 mr-2" />
+          Duplicate Project
         </DropdownMenuItem>
         <DropdownMenuItem
           className="cursor-pointer px-4 py-2.5 text-gray-700 dark:text-gray-300 hover:bg-blue-100 dark:hover:bg-gray-700 focus:bg-blue-100 dark:focus:bg-gray-700"

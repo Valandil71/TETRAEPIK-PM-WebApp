@@ -51,7 +51,7 @@ import {
 } from "@/lib/projects/collaborators";
 import { useProjectSelection } from "@/hooks/project/useProjectSelection";
 import { BulkSelectionBar } from "@/components/shared/BulkSelectionBar";
-import { createStmProject } from "@/lib/projects/stm";
+import { DuplicateProjectDialog } from "@/components/management/DuplicateProjectDialog";
 import { useProjectGroupExpansion } from "@/hooks/project/useProjectGroupExpansion";
 import { useProjectListPagination } from "@/hooks/project/useProjectListPagination";
 import { useWindowScrollMemory } from "@/hooks/ui/useWindowScrollMemory";
@@ -133,7 +133,10 @@ function ProjectManagementContent() {
 
   // State
   const [openMenu, setOpenMenu] = useState<string | null>(null);
-  const [creatingStmProjectId, setCreatingStmProjectId] = useState<number | null>(null);
+  const [duplicateDialogProject, setDuplicateDialogProject] = useState<{
+    id: number;
+    name: string;
+  } | null>(null);
   const [addTranslatorModal, setAddTranslatorModal] = useState<{
     open: boolean;
     projectId: number;
@@ -597,28 +600,6 @@ function ProjectManagementContent() {
       toast.error(getUserFriendlyError(error, "project management")),
   });
 
-  const createStmProjectMutation = useMutation({
-    mutationFn: (projectId: number) => createStmProject(supabase, projectId),
-    onMutate: (projectId) => {
-      setCreatingStmProjectId(projectId);
-    },
-    onSuccess: (newProject, projectId) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.projectsWithTranslators() });
-      queryClient.invalidateQueries({ queryKey: ["projects"] });
-      queryClient.invalidateQueries({ queryKey: queryKeys.project(projectId) });
-      toast.success("STM project created successfully. Opening it now.");
-      setOpenMenu(null);
-      router.push(`/project/${newProject.id}`);
-    },
-    onError: (error: Error) => {
-      toast.error(getUserFriendlyError(error, "project creation"));
-      setOpenMenu(null);
-    },
-    onSettled: () => {
-      setCreatingStmProjectId(null);
-    },
-  });
-
   // Handlers for words/lines editing
   const handleStartWordsLinesEdit = (
     projectId: number,
@@ -704,8 +685,12 @@ function ProjectManagementContent() {
     }
   };
 
-  const handleCreateStmProject = (projectId: number) => {
-    createStmProjectMutation.mutate(projectId);
+  const handleDuplicateProject = (projectId: number) => {
+    const project = allProjects.find((p) => p.id === projectId);
+    if (project) {
+      setDuplicateDialogProject({ id: projectId, name: project.name });
+      setOpenMenu(null);
+    }
   };
 
   const handleEditDetails = (projectId: number) => {
@@ -964,9 +949,7 @@ function ProjectManagementContent() {
           onAddTranslator={handleAddTranslator}
           onSelfAssign={handleSelfAssign}
           onRemoveTranslator={handleRemoveTranslator}
-          onCreateStmProject={handleCreateStmProject}
-          creatingStmProjectId={creatingStmProjectId}
-          isCreatingStmProject={createStmProjectMutation.isPending}
+          onDuplicateProject={handleDuplicateProject}
           onEditDetails={handleEditDetails}
           onCompleteProject={handleCompleteProject}
           onSelectMultiple={(projectId) => handleSelectMultiple(projectId)}
@@ -996,9 +979,7 @@ function ProjectManagementContent() {
           onAddTranslator={handleAddTranslator}
           onSelfAssign={handleSelfAssign}
           onRemoveTranslator={handleRemoveTranslator}
-          onCreateStmProject={handleCreateStmProject}
-          creatingStmProjectId={creatingStmProjectId}
-          isCreatingStmProject={createStmProjectMutation.isPending}
+          onDuplicateProject={handleDuplicateProject}
           onEditDetails={handleEditDetails}
           onCompleteProject={handleCompleteProject}
           onSelectMultiple={(projectId) => handleSelectMultiple(projectId)}
@@ -1031,6 +1012,10 @@ function ProjectManagementContent() {
       />
 
       {/* Modals */}
+      <DuplicateProjectDialog
+        project={duplicateDialogProject}
+        onClose={() => setDuplicateDialogProject(null)}
+      />
       <AddTranslatorDialog
         workloadListStatus="management"
         open={addTranslatorModal.open}
