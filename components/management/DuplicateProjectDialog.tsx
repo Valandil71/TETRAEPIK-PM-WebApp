@@ -119,8 +119,7 @@ export function DuplicateProjectDialog({ project, onClose }: DuplicateProjectDia
                 Duplicate project
               </span>
               <span className="block text-sm text-gray-500 dark:text-gray-400">
-                Opens a form with this project&apos;s details to change the system, work list,
-                deadlines or volumes. The copy is only created when you save it, and the SAP
+                Opens a form with this project&apos;s details, it is only created when you save it. The SAP
                 import does not update it.
               </span>
             </span>

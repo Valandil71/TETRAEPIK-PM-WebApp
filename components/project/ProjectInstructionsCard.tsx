@@ -109,7 +109,8 @@ function CollapsibleInstruction({
   isExcluding: boolean;
   onExclude: (text: string) => void;
 }) {
-  const [expanded, setExpanded] = useState(false);
+  // Expanded by default: PMs and translators read the full instruction; clicking collapses it
+  const [expanded, setExpanded] = useState(true);
   const fullText = long || short;
   const isLong = fullText.length > 80;
   const excludeButton = canExclude ? (

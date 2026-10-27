@@ -33,6 +33,7 @@ import {
   removeCollaborator,
 } from "@/lib/projects/collaborators";
 import { DuplicateProjectDialog } from "@/components/management/DuplicateProjectDialog";
+import { DeleteProjectSection } from "@/components/project/DeleteProjectSection";
 import { notifyAssigned, notifyProjectsCompleted } from "@/lib/notifications/notify";
 
 export default function ProjectPage() {
@@ -656,6 +657,9 @@ export default function ProjectPage() {
           </div>
         )}
       </div>
+
+      {/* PM/Admin: delete, below everything else */}
+      {canManageAssignments() && <DeleteProjectSection project={project} />}
 
       {/* PM/Admin Modals */}
       {canManageAssignments() && (
