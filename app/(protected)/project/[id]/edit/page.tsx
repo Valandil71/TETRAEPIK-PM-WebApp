@@ -41,7 +41,7 @@ import { queryKeys } from "@/lib/queryKeys";
 import { useLayoutStore } from "@/lib/stores/useLayoutStore";
 import { useManagementPageStore } from "@/lib/stores/useManagementPageStore";
 import type { ProjectWithTranslatorDetails } from "@/types/project";
-import { dateInputToTimestamp, toDateInputValue } from "@/lib/date-utils";
+import { dateTimeInputToTimestamp, toDateTimeInputValue } from "@/lib/date-utils";
 import { RoleGuard } from "@/components/auth/RoleGuard";
 import { RouteId } from "@/lib/roleAccess";
 import { useRoleAccess } from "@/hooks/user/useRoleAccess";
@@ -226,9 +226,9 @@ function EditProjectContent() {
       lines: project.lines ?? null,
       language_in: project.language_in || null,
       language_out: project.language_out || null,
-      initial_deadline: toDateInputValue(project.initial_deadline),
-      interim_deadline: toDateInputValue(project.interim_deadline),
-      final_deadline: toDateInputValue(project.final_deadline),
+      initial_deadline: toDateTimeInputValue(project.initial_deadline),
+      interim_deadline: toDateTimeInputValue(project.interim_deadline),
+      final_deadline: toDateTimeInputValue(project.final_deadline),
       instructions: project.instructions ?? null,
       paid: project.paid ?? false,
       invoiced: project.invoiced ?? false,
@@ -399,13 +399,13 @@ function EditProjectContent() {
         ? project.language_out || null
         : currentFormValues.language_out,
       initial_deadline: dbChangedFields.has("initial_deadline")
-        ? toDateInputValue(project.initial_deadline)
+        ? toDateTimeInputValue(project.initial_deadline)
         : currentFormValues.initial_deadline,
       interim_deadline: dbChangedFields.has("interim_deadline")
-        ? toDateInputValue(project.interim_deadline)
+        ? toDateTimeInputValue(project.interim_deadline)
         : currentFormValues.interim_deadline,
       final_deadline: dbChangedFields.has("final_deadline")
-        ? toDateInputValue(project.final_deadline)
+        ? toDateTimeInputValue(project.final_deadline)
         : currentFormValues.final_deadline,
       instructions: dbChangedFields.has("instructions")
         ? project.instructions || null
@@ -481,10 +481,10 @@ function EditProjectContent() {
       lines: values.lines ?? null,
       language_in: values.language_in || null,
       language_out: values.language_out || null,
-      // Keep the stored time of day: the form only edits the date part.
-      initial_deadline: dateInputToTimestamp(values.initial_deadline, project?.initial_deadline),
-      interim_deadline: dateInputToTimestamp(values.interim_deadline, project?.interim_deadline),
-      final_deadline: dateInputToTimestamp(values.final_deadline, project?.final_deadline),
+      // Unchanged deadlines keep their stored timestamp (with its seconds).
+      initial_deadline: dateTimeInputToTimestamp(values.initial_deadline, project?.initial_deadline),
+      interim_deadline: dateTimeInputToTimestamp(values.interim_deadline, project?.interim_deadline),
+      final_deadline: dateTimeInputToTimestamp(values.final_deadline, project?.final_deadline),
       instructions: values.instructions || null,
       paid: values.paid ?? false,
       invoiced: values.invoiced ?? false,
@@ -893,7 +893,7 @@ function EditProjectContent() {
                       <FormLabel>Initial Deadline</FormLabel>
                       <FormControl>
                         <Input
-                          type="date"
+                          type="datetime-local"
                           {...field}
                           value={field.value ?? ""}
                         />
@@ -911,7 +911,7 @@ function EditProjectContent() {
                       <FormLabel>Interim Deadline</FormLabel>
                       <FormControl>
                         <Input
-                          type="date"
+                          type="datetime-local"
                           {...field}
                           value={field.value ?? ""}
                         />
@@ -929,7 +929,7 @@ function EditProjectContent() {
                       <FormLabel>Final Deadline</FormLabel>
                       <FormControl>
                         <Input
-                          type="date"
+                          type="datetime-local"
                           {...field}
                           value={field.value ?? ""}
                         />
