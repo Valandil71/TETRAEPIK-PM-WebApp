@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, Suspense } from "react";
+import { useState, Suspense } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { createBrowserClient } from "@supabase/ssr";
@@ -28,15 +28,20 @@ function AuthFormContent() {
   const [error, setError] = useState<string | null>(null);
   const [showVerifyPopup, setShowVerifyPopup] = useState(false);
 
-  // Check for error params from callback
-  useEffect(() => {
-    const callbackError = searchParams.get("error");
+  // Show the error passed by the auth callback (?error=...). Adjusting state
+  // during render when the param changes avoids a setState-in-effect re-render.
+  const callbackError = searchParams.get("error");
+  const [shownCallbackError, setShownCallbackError] = useState<string | null>(
+    null
+  );
+  if (callbackError !== shownCallbackError) {
+    setShownCallbackError(callbackError);
     if (callbackError === "callback") {
       setError("Failed to verify your email. Please try again.");
     } else if (callbackError === "config") {
       setError("Configuration error. Please contact support.");
     }
-  }, [searchParams]);
+  }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
