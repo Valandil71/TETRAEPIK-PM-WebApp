@@ -1,0 +1,59 @@
+# Dependabot: opens PRs to keep dependencies up to date.
+#
+# npm weekly (Monday morning), GitHub Actions monthly. Minor/patch updates come
+# grouped in one PR; major updates come one PR each, to decide individually.
+# Security alerts/updates are separate (Settings -> Advanced Security).
+# Every PR runs CI. Nothing is merged automatically.
+version: 2
+
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "07:00"
+      timezone: Europe/Lisbon
+    # Wait 3 days on freshly published versions (protects against compromised
+    # packages that get pulled shortly after). Does not affect security updates.
+    cooldown:
+      default-days: 3
+    groups:
+      npm-minor-patch:
+        patterns: ["*"]
+        # @supabase/ssr is 0.x: a "minor" bump there can break auth, so it
+        # gets its own PR instead of hiding inside the group.
+        exclude-patterns: ["@supabase/ssr"]
+        update-types: [minor, patch]
+      # ESLint 10, eslint-plugin-react-hooks and eslint-config-next have to
+      # move together, so their major bumps come as one PR.
+      eslint-major:
+        patterns: ["eslint", "eslint-*", "@eslint/*"]
+        update-types: [major]
+    ignore:
+      # Node types must match the Node runtime (24.x, see .nvmrc and engines).
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+      # Deliberately postponed big migrations (remove the entry to get the PR):
+      # Tailwind 4 (CSS-first config, tailwindcss-animate, shadcn components).
+      - dependency-name: "tailwindcss"
+        update-types: ["version-update:semver-major"]
+      # TypeScript 7 (native compiler), until Next/ESLint tooling supports it.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+    open-pull-requests-limit: 5
+    labels: [dependencies]
+    commit-message:
+      prefix: "chore(deps)"
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+      timezone: Europe/Lisbon
+    groups:
+      actions:
+        patterns: ["*"]
+    labels: [dependencies, ci]
+    commit-message:
+      prefix: "chore(ci)"
