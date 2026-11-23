@@ -16,12 +16,18 @@ export async function proxy(req: NextRequest) {
     return res;
   }
 
+  // Anti-cache headers (Cache-Control: private, no-store...) that @supabase/ssr hands over
+  // when it writes auth cookies, so no CDN/proxy can serve one user's session to another.
+  // They only come with the first write, so keep them for when `res` is re-created.
+  const cacheHeaders: Record<string, string> = {};
+
   const supabase = createServerClient(supabaseUrl, supabaseKey, {
     cookies: {
       getAll() {
         return req.cookies.getAll();
       },
-      setAll(cookiesToSet) {
+      setAll(cookiesToSet, headers) {
+        Object.assign(cacheHeaders, headers);
         // First set on the request (for downstream server components)
         cookiesToSet.forEach(({ name, value }) => {
           req.cookies.set(name, value);
@@ -31,6 +37,9 @@ export async function proxy(req: NextRequest) {
         // Then set on the response (for the browser)
         cookiesToSet.forEach(({ name, value, options }) => {
           res.cookies.set(name, value, options);
+        });
+        Object.entries(cacheHeaders).forEach(([key, value]) => {
+          res.headers.set(key, value);
         });
       },
     },
