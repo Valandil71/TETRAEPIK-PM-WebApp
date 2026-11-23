@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getAuthenticatedSupabase } from '@/lib/api/withAuth';
-import { createErrorResponse } from '@/lib/sap/errors';
+import { handleRouteError } from '@/lib/api/errorResponse';
 import { createAdminClient } from '@/lib/supabase/admin';
 import {
   buildCompletionPayload,
@@ -21,10 +21,12 @@ const bodySchema = z.object({
  * One request carries the whole batch, so each PM/Admin gets a single (summarised) notification.
  */
 export async function POST(request: Request) {
+  let userId: string | null = null;
   try {
     const auth = await getAuthenticatedSupabase(['pm', 'admin']);
     if ('error' in auth) return auth.error;
     const { supabase, user } = auth;
+    userId = user.id;
 
     const parsed = bodySchema.safeParse(await request.json().catch(() => null));
     if (!parsed.success) {
@@ -60,6 +62,10 @@ export async function POST(request: Request) {
     const sent = await sendPushToUsers(admin, payloads);
     return NextResponse.json({ sent });
   } catch (error) {
-    return createErrorResponse(error, 'Failed to send completion notifications');
+    return handleRouteError(error, 'Failed to send completion notifications', {
+      route: '/api/notifications/project-completed',
+      method: 'POST',
+      userId,
+    });
   }
 }

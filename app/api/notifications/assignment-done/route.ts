@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getAuthenticatedSupabase } from '@/lib/api/withAuth';
-import { createErrorResponse } from '@/lib/sap/errors';
+import { handleRouteError } from '@/lib/api/errorResponse';
 import { createAdminClient } from '@/lib/supabase/admin';
 import {
   buildAssignmentDonePayload,
@@ -21,10 +21,12 @@ const bodySchema = z.object({
  * Any signed-in user may call it, but only for their own assignments that are really "done".
  */
 export async function POST(request: Request) {
+  let userId: string | null = null;
   try {
     const auth = await getAuthenticatedSupabase();
     if ('error' in auth) return auth.error;
     const { supabase, user } = auth;
+    userId = user.id;
 
     const parsed = bodySchema.safeParse(await request.json().catch(() => null));
     if (!parsed.success) {
@@ -73,6 +75,10 @@ export async function POST(request: Request) {
     const sent = await sendPushToUsers(admin, payloads);
     return NextResponse.json({ sent });
   } catch (error) {
-    return createErrorResponse(error, 'Failed to send assignment done notifications');
+    return handleRouteError(error, 'Failed to send assignment done notifications', {
+      route: '/api/notifications/assignment-done',
+      method: 'POST',
+      userId,
+    });
   }
 }

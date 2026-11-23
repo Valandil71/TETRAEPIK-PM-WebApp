@@ -8,15 +8,25 @@ import type {
   SapTokenResponse,
 } from '@/types/sap';
 import {
+  SAP_UNAVAILABLE_MESSAGE,
   SapApiError,
+  type UpstreamAttempt,
+  attachUpstreamDetails,
   SapConfigError,
   SapTokenError,
   isRetryableError,
+  isSapUnavailableStatus,
 } from './errors';
 
-// API Configuration
-const SAP_TOKEN_URL = 'https://lpxtpmsub.authentication.sap.hana.ondemand.com/oauth/token';
-const SAP_API_BASE_URL = 'https://lpxtpmsub-tpm.ingress.prod.lp.shoot.live.k8s-hana.ondemand.com';
+// API Configuration. Both URLs can be overridden via env vars (e.g. if SAP moves the
+// TPM service to a new cluster) without a code change; the defaults are the current hosts.
+const DEFAULT_SAP_TOKEN_URL = 'https://lpxtpmsub.authentication.sap.hana.ondemand.com/oauth/token';
+const DEFAULT_SAP_API_BASE_URL = 'https://lpxtpmsub-tpm.ingress.prod.lp.shoot.live.k8s-hana.ondemand.com';
+
+function readUrlEnv(name: string, fallback: string): string {
+  const value = process.env[name]?.trim();
+  return (value || fallback).replace(/\/+$/, '');
+}
 
 // Retry configuration
 const MAX_RETRIES = 3;
@@ -40,6 +50,28 @@ function debugLog(stage: string, data: Record<string, unknown>) {
   console.log(`[SAP-DEBUG] ${stage}:`, JSON.stringify(data, null, 2));
 }
 
+interface RequestTrace {
+  url: string;
+  attempts: UpstreamAttempt[];
+  lastStatus: number | null;
+  lastBody: string | null;
+  startedAt: number;
+}
+
+/** Short description of a low-level error, including Node's `cause` (e.g. ENOTFOUND). */
+function describeError(error: unknown): string {
+  if (typeof error === 'string') return error;
+  if (error instanceof Error) {
+    const cause = error.cause as { code?: string; message?: string } | undefined;
+    const causeText = cause ? ` (${cause.code ?? cause.message ?? String(cause)})` : '';
+    return `${error.name}: ${error.message}${causeText}`;
+  }
+  if (typeof error === 'object' && error !== null && 'name' in error) {
+    return String((error as { name?: unknown }).name);
+  }
+  return String(error);
+}
+
 /**
  * Server-side SAP TPM API client
  * Uses OAuth 2.0 Resource Owner Password Credentials grant for authentication
@@ -49,6 +81,8 @@ export class SapTpmApiClient {
   private jwtClientSecret: string;
   private username: string;
   private password: string;
+  private tokenUrl: string;
+  private apiBaseUrl: string;
   private accessToken: string | null = null;
   private tokenExpiresAt: number = 0;
 
@@ -75,6 +109,8 @@ export class SapTpmApiClient {
     this.jwtClientSecret = jwtClientSecret;
     this.username = username;
     this.password = password;
+    this.tokenUrl = readUrlEnv('SAP_TPM_TOKEN_URL', DEFAULT_SAP_TOKEN_URL);
+    this.apiBaseUrl = readUrlEnv('SAP_TPM_API_BASE_URL', DEFAULT_SAP_API_BASE_URL);
 
     debugLog('CONSTRUCTOR', {
       jwtClientId: `${jwtClientId.substring(0, 8)}...`,
@@ -109,7 +145,7 @@ export class SapTpmApiClient {
     });
 
     debugLog('TOKEN_REQUEST', {
-      url: SAP_TOKEN_URL,
+      url: this.tokenUrl,
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
@@ -122,9 +158,10 @@ export class SapTpmApiClient {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), TOKEN_TIMEOUT_MS);
 
+    const tokenStartedAt = Date.now();
     let response: Response;
     try {
-      response = await fetch(SAP_TOKEN_URL, {
+      response = await fetch(this.tokenUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -134,10 +171,19 @@ export class SapTpmApiClient {
         signal: controller.signal,
       });
     } catch (error) {
-      if (typeof error === 'object' && error !== null && 'name' in error && (error as { name?: string }).name === 'AbortError') {
-        throw new SapTokenError('Token request timed out');
-      }
-      throw error;
+      const tokenError =
+        typeof error === 'object' && error !== null && 'name' in error && (error as { name?: string }).name === 'AbortError'
+          ? new SapTokenError('Token request timed out')
+          : error;
+      attachUpstreamDetails(tokenError, {
+        service: 'sap-auth',
+        url: this.tokenUrl,
+        status: null,
+        body: null,
+        attempts: [{ at: new Date(tokenStartedAt).toISOString(), status: null, ms: Date.now() - tokenStartedAt, error: describeError(error) }],
+        durationMs: Date.now() - tokenStartedAt,
+      });
+      throw tokenError;
     } finally {
       clearTimeout(timeoutId);
     }
@@ -154,7 +200,16 @@ export class SapTpmApiClient {
         status: response.status,
         body: errorText,
       });
-      throw new SapTokenError(`Failed to obtain token: ${response.status} - ${errorText}`);
+      const tokenError = new SapTokenError(`Failed to obtain token: ${response.status} - ${errorText}`);
+      attachUpstreamDetails(tokenError, {
+        service: 'sap-auth',
+        url: this.tokenUrl,
+        status: response.status,
+        body: errorText,
+        attempts: [{ at: new Date(tokenStartedAt).toISOString(), status: response.status, ms: Date.now() - tokenStartedAt }],
+        durationMs: Date.now() - tokenStartedAt,
+      });
+      throw tokenError;
     }
 
     const data: SapTokenResponse = await response.json();
@@ -182,15 +237,52 @@ export class SapTpmApiClient {
 
   /**
    * Make authenticated API request with retry logic.
+   * On failure, the thrown error carries the SAP URL, every attempt, the last raw response
+   * body and the total duration (see attachUpstreamDetails) so it can be logged later.
+   */
+  private async request<T>(endpoint: string): Promise<T> {
+    const trace: RequestTrace = {
+      url: `${this.apiBaseUrl}${endpoint}`,
+      attempts: [],
+      lastStatus: null,
+      lastBody: null,
+      startedAt: Date.now(),
+    };
+    try {
+      return await this.requestWithRetry<T>(endpoint, MAX_RETRIES, trace);
+    } catch (error) {
+      attachUpstreamDetails(error, {
+        service: 'sap',
+        url: trace.url,
+        status: trace.lastStatus,
+        body: trace.lastBody,
+        attempts: trace.attempts,
+        durationMs: Date.now() - trace.startedAt,
+      });
+      throw error;
+    }
+  }
+
+  /**
    * Uses x-approuter-authorization header as required by SAP TPM API.
    */
-  private async request<T>(endpoint: string, retries = MAX_RETRIES): Promise<T> {
+  private async requestWithRetry<T>(endpoint: string, retries: number, trace: RequestTrace): Promise<T> {
     const token = await this.getAccessToken();
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
-    const requestUrl = `${SAP_API_BASE_URL}${endpoint}`;
+    const requestUrl = `${this.apiBaseUrl}${endpoint}`;
+    const attemptStartedAt = Date.now();
+    const recordAttempt = (status: number | null, error?: unknown) => {
+      trace.attempts.push({
+        at: new Date(attemptStartedAt).toISOString(),
+        status,
+        ms: Date.now() - attemptStartedAt,
+        ...(error !== undefined ? { error: describeError(error) } : {}),
+      });
+    };
+    let retryWithFreshToken = false;
     const requestHeaders = {
       Accept: 'application/json',
       'x-approuter-authorization': `Bearer ${token}`,
@@ -222,6 +314,9 @@ export class SapTpmApiClient {
 
       if (!response.ok) {
         const rawBody = await response.text();
+        recordAttempt(response.status);
+        trace.lastStatus = response.status;
+        trace.lastBody = rawBody;
         debugLog('API_ERROR_BODY', {
           status: response.status,
           body: rawBody.substring(0, 2000),
@@ -240,10 +335,21 @@ export class SapTpmApiClient {
             );
           }
         } catch {
-          error = new SapApiError(
-            rawBody || `SAP API error: ${response.status} ${response.statusText}`,
-            response.status
-          );
+          if (isSapUnavailableStatus(response.status)) {
+            // Non-JSON 502/503/504 comes from SAP's gateway (e.g. Istio "no healthy upstream"):
+            // the TPM service itself is down. Show a clear message; keep the raw body in the logs.
+            if (retries === 0) {
+              console.warn(
+                `[SAP] ${requestUrl} unavailable: ${response.status} ${rawBody.substring(0, 200)}`
+              );
+            }
+            error = new SapApiError(SAP_UNAVAILABLE_MESSAGE, response.status);
+          } else {
+            error = new SapApiError(
+              rawBody || `SAP API error: ${response.status} ${response.statusText}`,
+              response.status
+            );
+          }
         }
 
         if (error.isAuthError && retries > 0) {
@@ -254,19 +360,26 @@ export class SapTpmApiClient {
           });
           this.accessToken = null;
           this.tokenExpiresAt = 0;
-          return this.request<T>(endpoint, retries - 1);
+          retryWithFreshToken = true;
+        } else {
+          throw error;
         }
-
-        throw error;
+      } else {
+        recordAttempt(response.status);
+        return await response.json();
       }
-
-      return response.json();
     } catch (error) {
       clearTimeout(timeoutId);
 
       if (typeof error === 'object' && error !== null && 'name' in error && (error as { name?: string }).name === 'AbortError') {
         debugLog('TIMEOUT', { url: requestUrl });
+        recordAttempt(null, 'Request timeout');
         throw new SapApiError('Request timeout', 408);
+      }
+
+      if (!(error instanceof SapApiError)) {
+        // Network-level failure (DNS, TLS, connection reset...): no HTTP status
+        recordAttempt(null, error);
       }
 
       if (isRetryableError(error) && retries > 0) {
@@ -281,11 +394,18 @@ export class SapTpmApiClient {
         });
 
         await new Promise(resolve => setTimeout(resolve, delayMs));
-        return this.request<T>(endpoint, retries - 1);
+        return this.requestWithRetry<T>(endpoint, retries - 1, trace);
       }
 
       throw error;
     }
+
+    // Auth retry happens outside the try/catch so a failure in the retried request is not
+    // caught here and retried a second time.
+    if (retryWithFreshToken) {
+      return this.requestWithRetry<T>(endpoint, retries - 1, trace);
+    }
+    throw new Error('Unreachable: SAP request finished without a result');
   }
 
   /**

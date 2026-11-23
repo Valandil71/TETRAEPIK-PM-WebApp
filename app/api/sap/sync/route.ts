@@ -4,7 +4,8 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { createErrorResponse } from '@/lib/sap/errors';
+import { handleRouteError } from '@/lib/api/errorResponse';
+import { logApiError, type ErrorLogContext } from '@/lib/logging/errorLog';
 import { RATE_LIMIT_MINUTES } from '@/lib/sap/constants';
 import { ensureSapImportStatusRow, getSapImportStatus, acquireSapImportLock, finalizeSapImportStatus } from '@/lib/sap/import-lock';
 import { getSapClient } from '@/lib/sap/client';
@@ -15,6 +16,14 @@ import { sapSyncRequestSchema } from '@/types/sap';
 export async function POST(request: NextRequest) {
   let supabase: ReturnType<typeof createServerClient> | null = null;
   let lockAcquired = false;
+  let userId: string | null = null;
+  let requestedProjects: Array<{ projectId: number; subProjectId: string }> | null = null;
+  const logCtx = (context?: Record<string, unknown>): ErrorLogContext => ({
+    route: '/api/sap/sync',
+    method: 'POST',
+    userId,
+    context: { requestedProjects, ...context },
+  });
   try {
     const rawBody = await request.json();
     const parsed = sapSyncRequestSchema.safeParse(rawBody);
@@ -27,19 +36,23 @@ export async function POST(request: NextRequest) {
     }
 
     const body = parsed.data;
+    requestedProjects = body.projects;
 
     const auth = await getAuthenticatedSupabase(['pm', 'admin']);
     if ('error' in auth) return auth.error;
     supabase = auth.supabase;
     const { user } = auth;
+    userId = user.id;
 
     const { error: ensureStatusError } = await ensureSapImportStatusRow(supabase);
     if (ensureStatusError) {
+      logApiError(ensureStatusError, { ...logCtx({ step: 'ensure_status_row' }), httpStatus: 500 });
       return NextResponse.json({ error: 'Failed to initialize SAP import status' }, { status: 500 });
     }
 
     const { data: importStatus, error: importStatusError } = await getSapImportStatus(supabase);
     if (importStatusError) {
+      logApiError(importStatusError, { ...logCtx({ step: 'get_import_status' }), httpStatus: 500 });
       return NextResponse.json({ error: 'Failed to fetch SAP import status' }, { status: 500 });
     }
     if (importStatus?.status === 'running') {
@@ -72,6 +85,7 @@ export async function POST(request: NextRequest) {
 
     const { data: lockRow, error: lockError } = await acquireSapImportLock(supabase, user.id);
     if (lockError) {
+      logApiError(lockError, { ...logCtx({ step: 'acquire_lock' }), httpStatus: 500 });
       return NextResponse.json({ error: 'Failed to acquire SAP import lock' }, { status: 500 });
     }
     if (!lockRow) {
@@ -99,11 +113,28 @@ export async function POST(request: NextRequest) {
     const { error: finalizeError } = await finalizeSapImportStatus(supabase, 'idle');
     if (finalizeError) {
       console.error('Failed to finalize SAP import status:', finalizeError.message);
+      logApiError(finalizeError, { ...logCtx({ step: 'finalize_status' }), httpStatus: 200 });
     }
     lockAcquired = false;
 
-    const { hadSuccessfulSync, ...response } = result;
+    const { hadSuccessfulSync, failedItems, ...response } = result;
     void hadSuccessfulSync;
+
+    if (failedItems.length > 0) {
+      const partialFailure = new Error(
+        `SAP import finished with ${failedItems.length} failed item(s)`
+      );
+      partialFailure.name = 'SapImportPartialFailure';
+      logApiError(partialFailure, {
+        ...logCtx({
+          imported: result.imported,
+          updated: result.updated,
+          failedItems: failedItems.slice(0, 100),
+        }),
+        httpStatus: 200,
+      });
+    }
+
     return NextResponse.json(response);
   } catch (error) {
     if (lockAcquired && supabase) {
@@ -117,6 +148,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return createErrorResponse(error, 'Failed to sync SAP projects');
+    return handleRouteError(error, 'Failed to sync SAP projects', logCtx());
   }
 }

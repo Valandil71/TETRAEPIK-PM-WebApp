@@ -1,15 +1,17 @@
 import { NextResponse } from 'next/server';
-import { createErrorResponse } from '@/lib/sap/errors';
+import { handleRouteError } from '@/lib/api/errorResponse';
 import { getAuthenticatedSupabase } from '@/lib/api/withAuth';
 import { RATE_LIMIT_MINUTES } from '@/lib/sap/constants';
 
 const SAP_IMPORT_STATUS_ROW_ID = 1;
 
 export async function GET() {
+  let userId: string | null = null;
   try {
     const auth = await getAuthenticatedSupabase(['pm', 'admin']);
     if ('error' in auth) return auth.error;
     const { supabase, user } = auth;
+    userId = user.id;
 
     const { data: statusRow, error } = await supabase
       .from('sap_import_status')
@@ -56,6 +58,10 @@ export async function GET() {
       },
     });
   } catch (error) {
-    return createErrorResponse(error, 'Failed to fetch SAP import status');
+    return handleRouteError(error, 'Failed to fetch SAP import status', {
+      route: '/api/sap/import-status',
+      method: 'GET',
+      userId,
+    });
   }
 }

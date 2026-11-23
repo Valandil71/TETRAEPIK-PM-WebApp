@@ -6,7 +6,7 @@ import type { SapTpmApiClient } from './client';
 import type { SapSyncResponse } from '@/types/sap';
 import { mapSapSubProjectToProjects, sanitizeImportData } from './mappers';
 import { dedupeImportProjects, mergeModifiedProjects } from './sync-utils';
-import { createFailureRecorder } from './failure-log';
+import { createFailureRecorder, type FailedImportItem } from './failure-log';
 import { findExistingProject, updateProjectFromSap, insertProjectFromSap } from './project-writer';
 import { createImportReport, type ImportReportWarning, type NewProjectReport } from './report-writer';
 import type { ModifiedReportEntry } from './sync-utils';
@@ -24,6 +24,8 @@ export interface ManualImportParams {
 
 export interface ManualImportResult extends SapSyncResponse {
   hadSuccessfulSync: boolean;
+  /** Per-item failures with stage and ids (server-side only; saved to app_error_logs) */
+  failedItems: FailedImportItem[];
 }
 
 export async function runManualImport(params: ManualImportParams): Promise<ManualImportResult> {
@@ -183,6 +185,7 @@ export async function runManualImport(params: ManualImportParams): Promise<Manua
     updated: mergedModifiedProjects.length,
     failed: failures.failedCount,
     hadSuccessfulSync,
+    failedItems: failures.items,
     reportCreated,
     reportCreationError,
   };

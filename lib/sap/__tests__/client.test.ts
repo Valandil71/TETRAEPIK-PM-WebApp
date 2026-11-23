@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SapTpmApiClient } from '@/lib/sap/client';
-import { SapApiError, SapTokenError } from '@/lib/sap/errors';
+import { SAP_UNAVAILABLE_MESSAGE, SapApiError, SapTokenError, getUpstreamDetails } from '@/lib/sap/errors';
 
 function tokenResponse() {
   return new Response(
@@ -31,6 +31,8 @@ describe('SapTpmApiClient', () => {
     process.env.SAP_TPM_JWT_CLIENT_SECRET = 'secret';
     process.env.SAP_TPM_USERNAME = 'user';
     process.env.SAP_TPM_PASSWORD = 'pass';
+    delete process.env.SAP_TPM_API_BASE_URL;
+    delete process.env.SAP_TPM_TOKEN_URL;
     vi.restoreAllMocks();
   });
 
@@ -190,5 +192,98 @@ describe('SapTpmApiClient', () => {
     await assertion;
     expect(getApiCalls(fetchMock)).toHaveLength(4);
   });
-});
 
+  it('uses SAP_TPM_API_BASE_URL and SAP_TPM_TOKEN_URL overrides when set', async () => {
+    process.env.SAP_TPM_API_BASE_URL = 'https://new-tpm.example.com/ ';
+    process.env.SAP_TPM_TOKEN_URL = 'https://new-auth.example.com/oauth/token';
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(tokenResponse())
+      .mockResolvedValueOnce(apiResponse(200, { projects: [] }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const client = new SapTpmApiClient();
+    await client.getProjects();
+
+    expect(String(fetchMock.mock.calls[0][0])).toBe('https://new-auth.example.com/oauth/token');
+    expect(String(fetchMock.mock.calls[1][0])).toBe('https://new-tpm.example.com/v1/suppliers/projects');
+  });
+
+  it('maps a non-JSON gateway 503 ("no healthy upstream") to a clear unavailable message', async () => {
+    vi.useFakeTimers();
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const gateway503 = () =>
+      new Response('no healthy upstream', { status: 503, headers: { 'Content-Type': 'text/plain' } });
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(tokenResponse())
+      .mockResolvedValueOnce(gateway503())
+      .mockResolvedValueOnce(gateway503())
+      .mockResolvedValueOnce(gateway503())
+      .mockResolvedValueOnce(gateway503());
+    vi.stubGlobal('fetch', fetchMock);
+
+    const client = new SapTpmApiClient();
+    const promise = client.getProjects();
+    const assertion = expect(promise).rejects.toMatchObject({
+      status: 503,
+      message: SAP_UNAVAILABLE_MESSAGE,
+    });
+    await vi.runAllTimersAsync();
+    await assertion;
+    expect(getApiCalls(fetchMock)).toHaveLength(4);
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(String(warnSpy.mock.calls[0][0])).toContain('no healthy upstream');
+
+    const upstream = getUpstreamDetails(await promise.catch((e) => e));
+    expect(upstream).toMatchObject({
+      service: 'sap',
+      url: 'https://lpxtpmsub-tpm.ingress.prod.lp.shoot.live.k8s-hana.ondemand.com/v1/suppliers/projects',
+      status: 503,
+      body: 'no healthy upstream',
+    });
+    expect(upstream?.attempts.map((a) => a.status)).toEqual([503, 503, 503, 503]);
+  });
+
+  it('attaches token endpoint details when the SAP login fails', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(
+      new Response('{"error":"unauthorized","error_description":"Bad credentials"}', { status: 401 })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const client = new SapTpmApiClient();
+    const error = await client.getProjects().catch((e) => e);
+
+    expect(error).toBeInstanceOf(SapTokenError);
+    expect(getUpstreamDetails(error)).toMatchObject({
+      service: 'sap-auth',
+      url: 'https://lpxtpmsub.authentication.sap.hana.ondemand.com/oauth/token',
+      status: 401,
+      body: expect.stringContaining('Bad credentials'),
+    });
+  });
+
+  it('does not retry twice when the request after an auth refresh keeps failing', async () => {
+    vi.useFakeTimers();
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(tokenResponse())
+      .mockResolvedValueOnce(apiResponse(401, { error: 'unauthorized' }))
+      .mockResolvedValueOnce(tokenResponse())
+      .mockImplementation(async () => apiResponse(500, { error: 'server' }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const client = new SapTpmApiClient();
+    const promise = client.getProjects();
+    const assertion = expect(promise).rejects.toMatchObject({ status: 500 });
+    await vi.runAllTimersAsync();
+    await assertion;
+    // 1 (401) + 1 retry with fresh token + 2 transient retries = 4 API calls total
+    expect(getApiCalls(fetchMock)).toHaveLength(4);
+  });
+});

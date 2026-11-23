@@ -3,6 +3,50 @@
 
 import type { SapErrorDTO } from '@/types/sap';
 
+/** Shown when SAP's gateway reports the TPM service as down (502/503/504 without a SAP error body). */
+export const SAP_UNAVAILABLE_MESSAGE =
+  "SAP TPM is currently unavailable (problem on SAP's side). Please try again later.";
+
+export function isSapUnavailableStatus(status: number): boolean {
+  return status === 502 || status === 503 || status === 504;
+}
+
+/** One HTTP attempt against an external service (status null = no response, e.g. network error). */
+export interface UpstreamAttempt {
+  at: string;
+  status: number | null;
+  ms: number;
+  error?: string;
+}
+
+/** What we know about the external call behind an error, saved in app_error_logs. */
+export interface UpstreamDetails {
+  service: string;
+  url: string;
+  status: number | null;
+  body: string | null;
+  attempts: UpstreamAttempt[];
+  durationMs: number;
+}
+
+const UPSTREAM_KEY = '__upstreamDetails';
+
+/** Attach upstream details to a thrown error. Keeps the first (most specific) details attached. */
+export function attachUpstreamDetails(error: unknown, details: UpstreamDetails): void {
+  if (typeof error !== 'object' || error === null) return;
+  if (UPSTREAM_KEY in error) return;
+  try {
+    Object.defineProperty(error, UPSTREAM_KEY, { value: details, enumerable: false });
+  } catch {
+    // Frozen/non-extensible error objects: nothing to attach
+  }
+}
+
+export function getUpstreamDetails(error: unknown): UpstreamDetails | null {
+  if (typeof error !== 'object' || error === null) return null;
+  return (error as Record<string, UpstreamDetails | undefined>)[UPSTREAM_KEY] ?? null;
+}
+
 /**
  * Custom error class for SAP API errors
  */
